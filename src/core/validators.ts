@@ -1,7 +1,7 @@
 import path from "node:path";
 import fs from "fs-extra";
-import { readPackageScripts } from "./config.js";
 import { runCommand } from "./command-runner.js";
+import { resolveValidationCommands } from "./validationResolve.js";
 import { readableStamp, fileStamp } from "./date.js";
 import { writeFileSafe, pathExists, readText } from "./file-system.js";
 import { logger, spinner } from "./logger.js";
@@ -23,33 +23,27 @@ export async function runValidation(
   paths: ProjectPaths,
   reportFileName = "latest-validation.md",
 ): Promise<ValidationRunResult> {
-  const scripts = await readPackageScripts(paths.packageJson);
+  const resolved = await resolveValidationCommands(config, paths.cwd);
+  const commandMap = resolved.commands;
   const steps: ValidationStepResult[] = [];
 
   const keys = [
-    ...VALIDATION_ORDER.filter((k) => config.validation[k]),
-    ...Object.keys(config.validation).filter(
+    ...VALIDATION_ORDER.filter((k) => commandMap[k]),
+    ...Object.keys(commandMap).filter(
       (k) => !VALIDATION_ORDER.includes(k as (typeof VALIDATION_ORDER)[number]),
     ),
   ];
 
-  for (const key of keys) {
-    const command = config.validation[key];
-    if (!command) continue;
+  if (keys.length === 0) {
+    logger.warn(
+      "Nenhum comando de validação detectado/configurado. " +
+        "Defina validation.commands em harness.config.json ou use um adapter.",
+    );
+  }
 
-    const hasScript = Object.prototype.hasOwnProperty.call(scripts, key);
-    if (!hasScript) {
-      logger.warn(`"${key}" pulado: script "${key}" não existe no package.json.`);
-      steps.push({
-        name: key,
-        command,
-        status: "skipped",
-        exitCode: null,
-        durationMs: 0,
-        skippedReason: `script "${key}" ausente no package.json`,
-      });
-      continue;
-    }
+  for (const key of keys) {
+    const command = commandMap[key];
+    if (!command) continue;
 
     const spin = spinner(`Validando: ${key} (${command})`).start();
     const result = await runCommand(command, paths.cwd);

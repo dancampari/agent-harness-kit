@@ -9,11 +9,14 @@ import { renderTemplate } from "../src/core/templates.js";
 import { resolveProjectPaths, rel } from "../src/core/paths.js";
 
 describe("config schema", () => {
-  it("aplica defaults a um objeto vazio", () => {
+  it("aplica defaults universais a um objeto vazio", () => {
     const cfg = harnessConfigSchema.parse({});
     expect(cfg.agentTargets).toEqual(["codex"]);
-    expect(cfg.packageManager).toBe("pnpm");
-    expect(cfg.validation.lint).toBe("pnpm lint");
+    expect(cfg.mode).toBe("universal");
+    expect(cfg.installedAdapters).toEqual([]);
+    expect(cfg.validation.autoDetect).toBe(true);
+    expect(cfg.validation.commands).toEqual({});
+    expect(cfg.packageManager).toBeUndefined();
     expect(cfg.paths.harness).toBe(".harness");
   });
 
@@ -31,6 +34,13 @@ describe("config schema", () => {
   it("defaultConfig aceita agentTargets explícitos", () => {
     const cfg = defaultConfig("p", ["codex", "claude-code"]);
     expect(cfg.agentTargets).toEqual(["codex", "claude-code"]);
+  });
+
+  it("defaultConfig é universal e adaptativo", () => {
+    const cfg = defaultConfig("p");
+    expect(cfg.mode).toBe("universal");
+    expect(cfg.installedAdapters).toEqual([]);
+    expect(cfg.validation).toEqual({ autoDetect: true, commands: {} });
   });
 
   it("expõe paths do Claude por padrão", () => {

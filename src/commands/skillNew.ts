@@ -1,9 +1,14 @@
 import path from "node:path";
-import { resolveProjectPaths, rel } from "../core/paths.js";
-import { loadConfig } from "../core/config.js";
+import { resolveConfigured } from "../core/resolve.js";
+import { rel } from "../core/paths.js";
 import { writeFileSafe, pathExists } from "../core/file-system.js";
-import { readableStamp } from "../core/date.js";
 import { logger } from "../core/logger.js";
+
+export interface SkillNewOptions {
+  adapter?: string;
+  category?: string;
+  risk?: string;
+}
 
 function normalizeName(raw: string): string {
   return raw
@@ -13,90 +18,106 @@ function normalizeName(raw: string): string {
     .replace(/(^-|-$)/g, "");
 }
 
-function skillTemplate(name: string): string {
+function skillTemplate(
+  name: string,
+  category: string,
+  risk: string,
+): string {
   return `---
 name: ${name}
-description: Descreva claramente QUANDO usar e QUANDO NÃO usar esta skill.
+description: Descreva claramente QUANDO usar esta skill.
+category: ${category}
+risk_level: ${risk}
 ---
 
-# ${name}
+# Objetivo
 
-> Criada em ${readableStamp()}
+(Que problema esta skill resolve e o resultado esperado.)
 
-## Objetivo
-
-(Explique o problema que esta skill resolve e o resultado esperado.)
-
-## Quando usar
+# Quando usar
 
 - (Situação 1)
 - (Situação 2)
 
-## Quando não usar
+# Quando não usar
 
-- (Situação onde aplicar esta skill seria errado)
+- (Quando aplicar esta skill seria errado)
 - (Quando outra skill é mais adequada)
 
-## Regras obrigatórias
+# Regras obrigatórias
 
 - (Regra inegociável 1)
-- (Regra inegociável 2)
 - Não introduzir segredos hardcoded
 - Não quebrar funcionalidades existentes sem justificativa
 - Registrar decisões relevantes em \`.harness/decisions.md\`
 
-## Checklist de validação
+# Processo
+
+1. (Passo 1)
+2. (Passo 2)
+3. (Passo 3)
+
+# Checklist
 
 - [ ] (Verificação objetiva 1)
 - [ ] (Verificação objetiva 2)
-- [ ] Lint/typecheck/build/test executados ou justificados
+- [ ] Validações disponíveis executadas ou justificadas
 
-## Exemplos
-
-\`\`\`txt
-(Exemplo de uso correto desta skill)
-\`\`\`
-
-## Anti-padrões
+# Anti-padrões
 
 - ❌ (O que NÃO fazer 1)
 - ❌ (O que NÃO fazer 2)
 `;
 }
 
+const VALID_RISK = new Set(["low", "medium", "high"]);
+
 /**
- * `harness skill new <nome>`
- * Cria uma nova skill com frontmatter e seções padronizadas.
+ * `harness skill new <nome> [--adapter <stack>] [--category <cat>]`
+ * Cria uma skill universal (default: category "custom") ou uma skill de
+ * adapter (`.agents/skills/adapters/<stack>/<nome>/SKILL.md`).
  */
-export async function runSkillNew(rawName: string): Promise<void> {
+export async function runSkillNew(
+  rawName: string,
+  options: SkillNewOptions,
+): Promise<void> {
   const cwd = process.cwd();
   const name = normalizeName(rawName);
   if (!name) {
-    logger.error("Nome de skill inválido. Uso: harness skill new <nome>");
+    logger.error("Nome inválido. Uso: harness skill new <nome> [--adapter <stack>]");
     process.exitCode = 1;
     return;
   }
+  const risk = VALID_RISK.has(options.risk ?? "")
+    ? (options.risk as string)
+    : "medium";
 
-  const config = await loadConfig(
-    path.join(cwd, ".harness", "harness.config.json"),
-  ).catch(() => null);
-  const paths = resolveProjectPaths(
-    cwd,
-    config?.paths.harness,
-    config?.paths.skills,
-    config?.paths.codexHooks,
-  );
+  const { paths } = await resolveConfigured(cwd);
 
-  const target = path.join(paths.skillsDir, name, "SKILL.md");
+  let target: string;
+  let category: string;
+  if (options.adapter) {
+    const adapter = normalizeName(options.adapter);
+    category = `adapter:${adapter}`;
+    target = path.join(paths.skillsDir, "adapters", adapter, name, "SKILL.md");
+  } else {
+    category = normalizeName(options.category ?? "custom") || "custom";
+    target = path.join(paths.skillsDir, category, name, "SKILL.md");
+  }
+
   if (await pathExists(target)) {
-    logger.error(`Skill "${name}" já existe em ${rel(cwd, target)}.`);
+    logger.error(`Skill já existe em ${rel(cwd, target)}.`);
     process.exitCode = 1;
     return;
   }
 
-  await writeFileSafe(target, skillTemplate(name), false);
+  await writeFileSafe(target, skillTemplate(name, category, risk), false);
   logger.title("harness skill new");
   logger.success(`Skill criada: ${rel(cwd, target)}`);
-  logger.step("Preencha Objetivo, Quando usar/não usar, Regras e Anti-padrões.");
-  logger.hint("Skills bem definidas reduzem erros do agente.");
+  logger.info(`category: ${category} · risk_level: ${risk}`);
+  if (options.adapter) {
+    logger.hint("Skill de adapter (específica de stack) — fora do core universal.");
+  } else {
+    logger.hint("Skill universal — mantenha-a genérica e reutilizável.");
+  }
 }

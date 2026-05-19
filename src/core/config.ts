@@ -5,12 +5,10 @@ import type { AgentTarget, HarnessConfig } from "../types/index.js";
 
 export const validationSchema = z
   .object({
-    lint: z.string().optional(),
-    typecheck: z.string().optional(),
-    build: z.string().optional(),
-    test: z.string().optional(),
+    autoDetect: z.boolean().default(true),
+    commands: z.record(z.string()).default({}),
   })
-  .catchall(z.string());
+  .default({ autoDetect: true, commands: {} });
 
 export const harnessConfigSchema = z.object({
   projectName: z.string().default(""),
@@ -18,15 +16,14 @@ export const harnessConfigSchema = z.object({
     .array(z.enum(["codex", "claude-code", "cursor"]))
     .min(1)
     .default(["codex"]),
+  mode: z.string().default("universal"),
+  installedAdapters: z.array(z.string()).default([]),
+  // Opcional: dica de gerenciador. Não assume stack — apenas acelera a
+  // detecção quando já é conhecido.
   packageManager: z
     .enum(["pnpm", "npm", "yarn", "bun"])
-    .default("pnpm"),
-  validation: validationSchema.default({
-    lint: "pnpm lint",
-    typecheck: "pnpm typecheck",
-    build: "pnpm build",
-    test: "pnpm test",
-  }),
+    .optional(),
+  validation: validationSchema,
   paths: z
     .object({
       harness: z.string().default(".harness"),
@@ -52,7 +49,12 @@ export function defaultConfig(
   projectName: string,
   agentTargets?: AgentTarget[],
 ): HarnessConfig {
-  const seed: Record<string, unknown> = { projectName };
+  const seed: Record<string, unknown> = {
+    projectName,
+    mode: "universal",
+    installedAdapters: [],
+    validation: { autoDetect: true, commands: {} },
+  };
   if (agentTargets && agentTargets.length > 0) {
     seed.agentTargets = agentTargets;
   }

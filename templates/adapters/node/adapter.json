@@ -1,0 +1,6 @@
+{
+  "name": "node",
+  "description": "Adapter para projetos Node.js: revisão de scripts npm e armadilhas de runtime.",
+  "detect": { "files": ["package.json", ".nvmrc", "package-lock.json"], "dependencies": ["node", "npm", "yarn", "pnpm"] },
+  "skills": ["npm-scripts-review", "node-runtime-pitfalls"]
+}

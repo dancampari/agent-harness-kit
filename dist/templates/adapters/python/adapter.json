@@ -1,0 +1,6 @@
+{
+  "name": "python",
+  "description": "Adapter para projetos Python: revisão de ambientes virtuais, dependências e empacotamento.",
+  "detect": { "files": ["pyproject.toml", "requirements.txt", "setup.py", "Pipfile"], "dependencies": ["pip", "poetry", "pipenv", "uv"] },
+  "skills": ["venv-and-deps-review", "packaging-pyproject-review"]
+}

@@ -1,0 +1,6 @@
+{
+  "name": "php",
+  "description": "Adapter para projetos PHP: revisão de Composer e conformidade com padrões PSR.",
+  "detect": { "files": ["composer.json", "composer.lock"], "dependencies": ["composer", "php"] },
+  "skills": ["composer-review", "psr-standards-review"]
+}

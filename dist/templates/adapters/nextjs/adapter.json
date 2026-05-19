@@ -1,0 +1,6 @@
+{
+  "name": "nextjs",
+  "description": "Adapter para projetos Next.js: roteamento/renderização, fronteira server/client e integração Supabase.",
+  "detect": { "files": ["next.config.js", "next.config.mjs", "next.config.ts"], "dependencies": ["next"] },
+  "skills": ["nextjs-routing-and-rendering-review", "nextjs-server-client-boundary", "nextjs-supabase-integration"]
+}

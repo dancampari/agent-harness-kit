@@ -1,32 +1,31 @@
 # QA Checklist (antes de declarar pronto)
 
-> Use junto com a skill `qa-before-done`.
+> Use junto com as skills `agent-behavior/no-premature-victory` e
+> `core/validation-before-done`. Universal — não assume stack.
 
 ## Funcional
 
 - [ ] O objetivo da tarefa foi cumprido de fato (não parcialmente)
-- [ ] Casos de erro tratados (input inválido, falha de rede, ausência de dados)
+- [ ] Casos de erro tratados (entrada inválida, falha externa, ausência de dados)
 - [ ] Nenhuma regressão em fluxos existentes
 
 ## Qualidade
 
-- [ ] `lint` executado ou justificado
-- [ ] `typecheck` executado ou justificado
-- [ ] `build` executado ou justificado
-- [ ] `test` executado ou justificado
+- [ ] Validações disponíveis executadas (lint/typecheck/build/test) ou justificadas
 - [ ] Sem `TODO`/`FIXME`/`XXX`/`HACK` críticos remanescentes
+- [ ] Complexidade/duplicação não pioraram sem motivo
 
 ## Segurança / dados
 
-- [ ] Sem segredos hardcoded; variáveis de ambiente documentadas
-- [ ] Multi-tenant preservado (sem vazamento entre tenants)
-- [ ] RLS preservado (se Supabase)
-- [ ] service role nunca exposto ao client
+- [ ] Sem segredos hardcoded; configuração sensível fora do código
+- [ ] Limites de autenticação/autorização respeitados
+- [ ] Isolamento de dados preservado quando houver múltiplos donos/tenants
+- [ ] Entradas validadas nas fronteiras do sistema
 
-## Integrações
+## Integrações (se aplicável)
 
-- [ ] Webhooks idempotentes
-- [ ] Mensagens automáticas só com toggle/config explícita
+- [ ] Chamadas externas com tratamento de erro e timeout/retry adequados
+- [ ] Operações sensíveis idempotentes (sem efeito duplicado)
 
 ## Registro
 

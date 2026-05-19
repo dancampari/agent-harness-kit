@@ -1,8 +1,10 @@
 import path from "node:path";
 import { resolveProjectPaths } from "../core/paths.js";
 import { pathExists } from "../core/file-system.js";
-import { loadConfig, readPackageScripts } from "../core/config.js";
+import { loadConfig } from "../core/config.js";
 import { isToolAvailable } from "../core/command-runner.js";
+import { profileProject } from "../core/profiler.js";
+import { resolveValidationCommands } from "../core/validationResolve.js";
 import { logger } from "../core/logger.js";
 import type { DoctorCheck } from "../types/index.js";
 
@@ -64,15 +66,6 @@ export async function runDoctor(): Promise<void> {
     await check(".claude/hooks/", paths.claudeHooksDir, "Rode `harness export claude-code`.");
   }
 
-  // pnpm disponível?
-  const pnpmOk = await isToolAvailable("pnpm");
-  checks.push({
-    label: "pnpm no PATH",
-    ok: pnpmOk,
-    detail: pnpmOk ? "disponível" : "não encontrado",
-    ...(pnpmOk ? {} : { suggestion: "Instale o pnpm: npm i -g pnpm" }),
-  });
-
   // git disponível?
   const gitOk = await isToolAvailable("git");
   checks.push({
@@ -82,36 +75,66 @@ export async function runDoctor(): Promise<void> {
     ...(gitOk ? {} : { suggestion: "Instale o Git." }),
   });
 
-  // Config válida + scripts esperados
-  if (await pathExists(paths.configFile)) {
-    try {
-      const config = await loadConfig(paths.configFile);
-      const scripts = await readPackageScripts(paths.packageJson);
-      for (const key of Object.keys(config.validation)) {
-        if (!config.validation[key]) continue;
-        const present = Object.prototype.hasOwnProperty.call(scripts, key);
-        checks.push({
-          label: `script "${key}" no package.json`,
-          ok: present,
-          detail: present ? "definido" : "ausente",
-          ...(present
-            ? {}
-            : {
-                suggestion: `Adicione um script "${key}" ou ajuste validation.${key} no harness.config.json.`,
-              }),
-        });
-      }
-    } catch (error) {
-      checks.push({
-        label: "harness.config.json válido",
-        ok: false,
-        detail: error instanceof Error ? error.message : String(error),
-        suggestion: "Corrija o JSON conforme o schema.",
-      });
+  // ---- Perfil do projeto (detecção, sem assumir stack) ----
+  const profile = await profileProject(cwd);
+  logger.plain();
+  logger.title("Projeto detectado");
+  logger.plain(`  Linguagem      : ${profile.language}`);
+  logger.plain(`  Gerenciador    : ${profile.packageManager ?? "—"}`);
+  logger.plain(`  Framework      : ${profile.framework ?? "—"}`);
+  logger.plain(
+    `  Sinais         : ${[
+      profile.hasTests && "testes",
+      profile.hasDocker && "docker",
+      profile.hasCI && "ci/cd",
+      profile.hasDatabase && "banco/migrations",
+      profile.hasFrontend && "frontend",
+      profile.hasBackend && "backend/api",
+    ]
+      .filter(Boolean)
+      .join(", ") || "nenhum detectado"}`,
+  );
+
+  // ---- Validações (detectadas/configuradas, não assumidas) ----
+  if (config) {
+    const resolved = await resolveValidationCommands(config, cwd);
+    const entries = Object.entries(resolved.commands);
+    logger.plain();
+    logger.title(`Validações (${resolved.source})`);
+    if (entries.length === 0) {
+      logger.plain("  (nenhuma) — configure validation.commands ou adicione scripts.");
+    } else {
+      for (const [k, v] of entries) logger.plain(`  ${k}: ${v}`);
     }
   }
 
+  // ---- Adapters sugeridos (NUNCA instala automaticamente) ----
   logger.plain();
+  logger.title("Adapters sugeridos");
+  if (profile.suggestedAdapters.length === 0) {
+    logger.plain("  Nenhum (projeto genérico ou stack não reconhecida).");
+  } else {
+    for (const a of profile.suggestedAdapters) {
+      const installed = config?.installedAdapters?.includes(a.name);
+      logger.plain(
+        `  ${a.name} [confiança: ${a.confidence}] — ${a.reason}${
+          installed ? " (instalado)" : ""
+        }`,
+      );
+    }
+    logger.hint(
+      "Instale manualmente quando fizer sentido: harness adapter add <nome>",
+    );
+  }
+
+  if (profile.risks.length > 0) {
+    logger.plain();
+    logger.title("Riscos iniciais");
+    for (const r of profile.risks) logger.plain(`  • ${r}`);
+  }
+
+  logger.plain();
+  logger.title("Estrutura");
   let problems = 0;
   for (const c of checks) {
     if (c.ok) {

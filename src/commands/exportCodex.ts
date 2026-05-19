@@ -3,7 +3,12 @@ import chalk from "chalk";
 import { resolveProjectPaths, rel } from "../core/paths.js";
 import { loadConfig } from "../core/config.js";
 import { pathExists } from "../core/file-system.js";
-import { materializeTemplate, SKILL_DIRS, HOOK_FILES } from "../core/templates.js";
+import {
+  materializeTemplate,
+  listCoreSkillTemplates,
+  skillSubPath,
+  HOOK_FILES,
+} from "../core/templates.js";
 import { logger } from "../core/logger.js";
 
 const CODEX_INSTRUCTION =
@@ -46,12 +51,12 @@ export async function runExportCodex(): Promise<void> {
     logger.success(`Criado ${rel(cwd, paths.agentsFile)}`);
   }
 
-  // Skills — cria apenas as ausentes.
+  // Skills universais — cria apenas as ausentes (não duplica).
   let createdSkills = 0;
-  for (const skill of SKILL_DIRS) {
-    const target = path.join(paths.skillsDir, skill, "SKILL.md");
+  for (const relTpl of await listCoreSkillTemplates()) {
+    const target = path.join(paths.skillsDir, skillSubPath(relTpl));
     if (await pathExists(target)) continue;
-    await materializeTemplate(`skills/${skill}/SKILL.md`, target, vars, false);
+    await materializeTemplate(relTpl, target, vars, false);
     createdSkills += 1;
   }
   logger.success(

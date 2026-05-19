@@ -10,6 +10,12 @@ export interface ValidationCommands {
   [key: string]: string | undefined;
 }
 
+/** Validação adaptativa: detecta comandos ou usa os configurados. */
+export interface ValidationConfig {
+  autoDetect: boolean;
+  commands: Record<string, string>;
+}
+
 export interface HarnessPaths {
   harness: string;
   skills: string;
@@ -21,8 +27,10 @@ export interface HarnessPaths {
 export interface HarnessConfig {
   projectName: string;
   agentTargets: AgentTarget[];
-  packageManager: PackageManager;
-  validation: ValidationCommands;
+  mode: string;
+  installedAdapters: string[];
+  packageManager?: PackageManager;
+  validation: ValidationConfig;
   paths: HarnessPaths;
 }
 

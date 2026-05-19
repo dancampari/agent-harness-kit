@@ -3,7 +3,12 @@ import chalk from "chalk";
 import { resolveProjectPaths, rel } from "../core/paths.js";
 import { loadConfig } from "../core/config.js";
 import { pathExists } from "../core/file-system.js";
-import { materializeTemplate, SKILL_DIRS, HOOK_FILES } from "../core/templates.js";
+import {
+  materializeTemplate,
+  listCoreSkillTemplates,
+  skillSubPath,
+  HOOK_FILES,
+} from "../core/templates.js";
 import { logger } from "../core/logger.js";
 
 const CLAUDE_INSTRUCTION =
@@ -54,12 +59,12 @@ export async function runExportClaude(): Promise<void> {
     logger.success(`Criado ${rel(cwd, paths.claudeFile)}`);
   }
 
-  // Skills — mesmas skills neutras, materializadas em .claude/skills/.
+  // Skills universais do core, materializadas em .claude/skills/.
   let createdSkills = 0;
-  for (const skill of SKILL_DIRS) {
-    const target = path.join(paths.claudeSkillsDir, skill, "SKILL.md");
+  for (const relTpl of await listCoreSkillTemplates()) {
+    const target = path.join(paths.claudeSkillsDir, skillSubPath(relTpl));
     if (await pathExists(target)) continue;
-    await materializeTemplate(`skills/${skill}/SKILL.md`, target, vars, false);
+    await materializeTemplate(relTpl, target, vars, false);
     createdSkills += 1;
   }
   logger.success(

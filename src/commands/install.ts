@@ -19,7 +19,7 @@ import {
 import type {
   AgentTarget,
   PackageManager,
-  ValidationCommands,
+  ValidationConfig,
 } from "../types/index.js";
 
 export interface InstallOptions {
@@ -34,7 +34,7 @@ interface InstallPlan {
   projectName: string;
   packageManager: PackageManager;
   targets: AgentTarget[];
-  validation: ValidationCommands;
+  validation: ValidationConfig;
   installHooks: boolean;
   force: boolean;
 }
@@ -70,7 +70,7 @@ async function planNonInteractive(
     packageManager: pm,
     targets,
     validation:
-      info.existingConfig?.validation ?? buildValidation(pm),
+      info.existingConfig?.validation ?? { autoDetect: true, commands: {} },
     installHooks: options.hooks !== false && supportsHooks(targets),
     force: Boolean(options.force),
   };
@@ -127,16 +127,17 @@ async function planInteractive(
   if (p.isCancel(pmAnswer)) cancelAndExit();
   const packageManager = pmAnswer as PackageManager;
 
-  const defaults = buildValidation(packageManager);
-  const useDefaults = await p.confirm({
-    message: `Usar comandos de validação padrão do ${packageManager}? (ex.: "${defaults.lint}")`,
+  const autoDetectAnswer = await p.confirm({
+    message:
+      "Detectar os comandos de validação automaticamente? (recomendado — universal, sem assumir stack)",
     initialValue: true,
   });
-  if (p.isCancel(useDefaults)) cancelAndExit();
+  if (p.isCancel(autoDetectAnswer)) cancelAndExit();
 
-  let validation: ValidationCommands = { ...defaults };
-  if (!useDefaults) {
-    const custom: ValidationCommands = {};
+  let validation: ValidationConfig = { autoDetect: true, commands: {} };
+  if (autoDetectAnswer !== true) {
+    const defaults = buildValidation(packageManager);
+    const commands: Record<string, string> = {};
     for (const key of ["lint", "typecheck", "build", "test"] as const) {
       const ans = await p.text({
         message: `Comando para "${key}" (vazio = não usar)`,
@@ -144,9 +145,9 @@ async function planInteractive(
       });
       if (p.isCancel(ans)) cancelAndExit();
       const value = String(ans).trim();
-      if (value) custom[key] = value;
+      if (value) commands[key] = value;
     }
-    validation = custom;
+    validation = { autoDetect: false, commands };
   }
 
   let installHooks = false;
@@ -188,9 +189,13 @@ async function planInteractive(
       `Projeto      : ${plan.projectName}`,
       `Agentes      : ${labels}`,
       `Gerenciador  : ${plan.packageManager}`,
-      `Validações   : ${Object.entries(plan.validation)
-        .map(([k, v]) => `${k}="${v}"`)
-        .join("  ")}`,
+      `Validações   : ${
+        plan.validation.autoDetect
+          ? "autoDetect (universal)"
+          : Object.entries(plan.validation.commands)
+              .map(([k, v]) => `${k}="${v}"`)
+              .join("  ") || "(nenhuma)"
+      }`,
       `Hooks        : ${plan.installHooks ? "instalar" : "não"}`,
       `Arquivos     : ${plan.force ? "sobrescrever (backup)" : "preservar existentes"}`,
     ].join("\n"),

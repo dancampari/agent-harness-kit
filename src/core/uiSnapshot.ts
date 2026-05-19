@@ -1,5 +1,7 @@
 import fs from "fs-extra";
+import path from "node:path";
 import { resolveConfigured } from "./resolve.js";
+import { profileProject } from "./profiler.js";
 import {
   listRuns,
   readActiveRun,
@@ -14,12 +16,29 @@ import type {
 export interface UiSnapshot {
   projectName: string;
   cwd: string;
+  stack: string;
+  skillCount: number;
+  installedAdapters: string[];
   hasActiveRun: boolean;
   active: RunRecord | null;
   runs: RunRecord[];
   events: HarnessEvent[];
   reportExcerpt: string;
   watchPaths: string[];
+}
+
+async function countSkills(skillsDir: string): Promise<number> {
+  if (!(await fs.pathExists(skillsDir))) return 0;
+  let n = 0;
+  async function walk(d: string): Promise<void> {
+    for (const e of (await fs.readdir(d, { withFileTypes: true })) as fs.Dirent[]) {
+      const full = path.join(d, e.name);
+      if (e.isDirectory()) await walk(full);
+      else if (e.name === "SKILL.md") n += 1;
+    }
+  }
+  await walk(skillsDir);
+  return n;
 }
 
 /** Lê todo o estado necessário para a UI (somente leitura, nunca lança). */
@@ -30,6 +49,13 @@ export async function loadSnapshot(cwd: string): Promise<UiSnapshot> {
     const active = await readActiveRun(paths);
     const runs = await listRuns(paths);
     const events = active ? await readEvents(paths, active.runId, 12) : [];
+    const profile = await profileProject(cwd).catch(() => null);
+    const stack = profile
+      ? `${profile.language}${
+          profile.framework ? ` · ${profile.framework}` : ""
+        }${profile.packageManager ? ` · ${profile.packageManager}` : ""}`
+      : "não detectada";
+    const skillCount = await countSkills(paths.skillsDir);
 
     let reportExcerpt = "";
     try {
@@ -46,6 +72,9 @@ export async function loadSnapshot(cwd: string): Promise<UiSnapshot> {
     return {
       projectName: config?.projectName || "(sem nome)",
       cwd,
+      stack,
+      skillCount,
+      installedAdapters: config?.installedAdapters ?? [],
       hasActiveRun: Boolean(pointer && active),
       active,
       runs,
@@ -61,6 +90,9 @@ export async function loadSnapshot(cwd: string): Promise<UiSnapshot> {
     return {
       projectName: "(indisponível)",
       cwd,
+      stack: "não detectada",
+      skillCount: 0,
+      installedAdapters: [],
       hasActiveRun: false,
       active: null,
       runs: [],

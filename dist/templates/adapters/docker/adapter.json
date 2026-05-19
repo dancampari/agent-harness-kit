@@ -1,0 +1,6 @@
+{
+  "name": "docker",
+  "description": "Adapter para projetos com Docker: revisão de Dockerfile e orquestração de serviços via Compose.",
+  "detect": { "files": ["Dockerfile", "docker-compose.yml", "docker-compose.yaml", ".dockerignore", "compose.yaml"], "dependencies": ["docker", "docker-compose"] },
+  "skills": ["dockerfile-review", "compose-services-review"]
+}

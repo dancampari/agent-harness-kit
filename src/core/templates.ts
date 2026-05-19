@@ -38,14 +38,99 @@ export async function materializeTemplate(
   return writeFileSafe(target, content, force);
 }
 
-export const SKILL_DIRS = [
-  "nextjs-supabase-builder",
-  "supabase-rls-reviewer",
-  "n8n-evolution-workflow",
-  "qa-before-done",
-  "multi-tenant-security-reviewer",
-  "webhook-idempotency-reviewer",
-] as const;
+/** Caminho POSIX relativo (sempre com "/"). */
+function toPosix(p: string): string {
+  return p.split(path.sep).join("/");
+}
+
+/**
+ * Lista recursivamente todos os SKILL.md sob `templates/skills`,
+ * retornando caminhos relativos a `templates/` (ex.:
+ * "skills/core/project-discovery/SKILL.md"). Universal: não há lista
+ * fixa de skills no código — a categoria é a estrutura de pastas.
+ */
+export async function listCoreSkillTemplates(): Promise<string[]> {
+  const root = path.join(getTemplatesDir(), "skills");
+  if (!(await fs.pathExists(root))) return [];
+  const out: string[] = [];
+  async function walk(dir: string): Promise<void> {
+    const entries = (await fs.readdir(dir, {
+      withFileTypes: true,
+    })) as fs.Dirent[];
+    for (const e of entries) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) await walk(full);
+      else if (e.name === "SKILL.md") {
+        out.push(toPosix(path.relative(getTemplatesDir(), full)));
+      }
+    }
+  }
+  await walk(root);
+  return out.sort();
+}
+
+/** Subcaminho da skill relativo a `skills/` (ex.: "core/x/SKILL.md"). */
+export function skillSubPath(relTemplatePath: string): string {
+  return relTemplatePath.replace(/^skills\//, "");
+}
+
+export interface AdapterManifest {
+  name: string;
+  description: string;
+  detect?: { files?: string[]; dependencies?: string[] };
+  skills?: string[];
+}
+
+/** Lista os nomes de adapters disponíveis no pacote. */
+export async function listAdapters(): Promise<string[]> {
+  const root = path.join(getTemplatesDir(), "adapters");
+  if (!(await fs.pathExists(root))) return [];
+  const entries = (await fs.readdir(root, {
+    withFileTypes: true,
+  })) as fs.Dirent[];
+  return entries
+    .filter((e) => e.isDirectory())
+    .map((e) => e.name)
+    .sort();
+}
+
+export async function readAdapterManifest(
+  name: string,
+): Promise<AdapterManifest | null> {
+  const file = path.join(getTemplatesDir(), "adapters", name, "adapter.json");
+  if (!(await fs.pathExists(file))) return null;
+  try {
+    return (await fs.readJson(file)) as AdapterManifest;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Lista os SKILL.md de um adapter, relativos a `templates/`
+ * (ex.: "adapters/nextjs/skills/x/SKILL.md").
+ */
+export async function listAdapterSkillTemplates(
+  name: string,
+): Promise<string[]> {
+  const root = path.join(getTemplatesDir(), "adapters", name, "skills");
+  if (!(await fs.pathExists(root))) return [];
+  const out: string[] = [];
+  async function walk(dir: string): Promise<void> {
+    const entries = (await fs.readdir(dir, {
+      withFileTypes: true,
+    })) as fs.Dirent[];
+    for (const e of entries) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) await walk(full);
+      else if (e.name === "SKILL.md") {
+        out.push(toPosix(path.relative(getTemplatesDir(), full)));
+      }
+    }
+  }
+  await walk(root);
+  return out.sort();
+}
 
 export const HOOK_FILES = [
   "pre_tool_use_policy.ts",

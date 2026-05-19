@@ -1,0 +1,6 @@
+{
+  "name": "database",
+  "description": "Adapter para bancos com políticas/RLS e migrações: revisão de isolamento por tenant e portabilidade SQL.",
+  "detect": { "files": ["schema.sql", "supabase/config.toml", "prisma/schema.prisma", "knexfile.js", "alembic.ini"], "dependencies": ["prisma", "knex", "sequelize", "supabase", "alembic", "typeorm"] },
+  "skills": ["rls-and-tenant-policy-review", "sql-migration-vendor-review"]
+}

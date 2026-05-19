@@ -26,7 +26,7 @@ const DESTRUCTIVE_PATTERNS: Array<{ re: RegExp; reason: string }> = [
   { re: /\bgit\s+clean\s+-[a-z]*f[a-z]*d?\b/i, reason: "git clean -fd (apaga arquivos)" },
   { re: /\bgit\s+checkout\s+--\s+\./i, reason: "git checkout -- . (descarta tudo)" },
   { re: /\b(rm|del|Remove-Item|unlink)\b[^\n]*\.env\b/i, reason: "remoção de .env" },
-  { re: /\b(rm|del|Remove-Item)\b[^\n]*(migrations?|supabase[\/\\]migrations)/i, reason: "remoção de migrations" },
+  { re: /\b(rm|del|Remove-Item)\b[^\n]*migrations?\b/i, reason: "remoção de migrations" },
   { re: /\bDROP\s+(TABLE|DATABASE|SCHEMA)\b/i, reason: "DROP destrutivo de banco" },
   { re: /\bgit\s+push\b[^\n]*--force(?!-with-lease)/i, reason: "git push --force sem lease" },
 ];

@@ -89,8 +89,13 @@ Este kit materializa esse harness em qualquer projeto.
   evals/
     regression-cases.yaml
     acceptance-tests.yaml
-AGENTS.md                     # fonte canônica de diretrizes
-.agents/skills/<6 skills>/SKILL.md   # skills neutras
+AGENTS.md                     # Prompt Master universal (sem stack)
+.agents/skills/
+  core/ engineering/ architecture/ quality/ security/
+  data/ frontend/ api/ operations/ agent-behavior/
+    <skill>/SKILL.md           # ~48 skills universais por categoria
+  adapters/<stack>/<skill>/SKILL.md   # só após `harness adapter add`
+.harness/adapters/{available,installed}/   # controle de adapters
 
 # se "codex" ∈ agentTargets:
 .codex/
@@ -103,7 +108,7 @@ AGENTS.md                     # fonte canônica de diretrizes
 # se "claude-code" ∈ agentTargets:
 CLAUDE.md                     # aponta para AGENTS.md (sem duplicar)
 .claude/
-  skills/<6 skills>/SKILL.md
+  skills/<categoria>/<skill>/SKILL.md   # mesmas skills universais
   hooks/{pre_tool_use_policy,post_tool_use_review,stop_validate_done}.ts
   settings.example.json       # hooks no formato do Claude Code
   # após `harness hooks install claude`:
@@ -217,7 +222,7 @@ Rodar `init --agent ...` num projeto já iniciado **atualiza apenas
 Cria/atualiza `current-task.md`, gera critérios de aceite e registra a run.
 
 ```bash
-harness task "Criar conexão QR Code da Evolution por barbearia no BarberPro"
+harness task "Adicionar validação de entrada e tratamento de erro no endpoint X"
 ```
 
 ### `harness export codex`
@@ -307,7 +312,7 @@ com backup. Observação: `TaskCompleted` não é nativo no Claude Code atual
 ### Como iniciar uma feature
 
 ```bash
-harness feature start "Conexão QR Code da Evolution por barbearia" --agent claude
+harness feature start "Implementar paginação na listagem" --agent claude
 ```
 
 Cria `.harness/runs/<runId>/` com `run.json`, `events.jsonl`,
@@ -375,27 +380,37 @@ Resposta do hook:
 O relatório `implementation-report.md` (e `.harness/reports/latest.md`)
 é gerado mesmo quando bloqueado (parcial), com falhas e correções.
 
-### Uso em projetos Next.js / Supabase / n8n / Evolution
+## Arquitetura universal (sem assumir stack)
 
-O fluxo é o mesmo; os critérios de bloqueio e as skills cobrem os riscos
-recorrentes desses stacks:
+O kit é **agnóstico de stack**. O core nunca contém skill específica de
+tecnologia.
+
+- **Core universal** — ~48 skills em 10 categorias (`core`, `engineering`,
+  `architecture`, `quality`, `security`, `data`, `frontend`, `api`,
+  `operations`, `agent-behavior`). Instaladas por `harness init`.
+- **Prompt Master universal** — `AGENTS.md`/`CLAUDE.md` orientam
+  comportamento do agente; não citam framework/banco como regra.
+- **Project Profiler adaptativo** — `harness doctor` detecta linguagem,
+  gerenciador, framework, testes, Docker, CI, banco, frontend/backend,
+  comandos de validação e riscos — **sem assumir**.
+- **Validation Engine adaptativo** — `validation.autoDetect` usa os
+  comandos detectados; ou defina `validation.commands` no
+  `harness.config.json`.
+- **Adapters opcionais** — skills de stack (`node`, `python`, `php`,
+  `react`, `nextjs`, `docker`, `database`, `wordpress`, `generic-api`)
+  vivem fora do core e **só são instaladas quando você pede**:
 
 ```bash
-harness init --agent claude-code
-harness hooks install claude
-harness feature start "Webhook Evolution v2 idempotente" --agent claude
-# trabalhe com o Claude Code / Codex normalmente
-harness ui            # acompanhe em outra aba do terminal
+harness doctor                 # detecta a stack e SUGERE adapters
+harness adapter list           # adapters disponíveis/sugeridos
+harness adapter add nextjs     # instala skills de stack (opt-in)
+harness skills list            # skills instaladas por categoria
+harness skill new cache-review                 # nova skill universal
+harness skill new ssr-review --adapter nextjs  # nova skill de adapter
 ```
 
-- **Supabase/RLS**: alterar auth/policies sem registrar em
-  `decisions.md` bloqueia; use a skill `supabase-rls-reviewer`.
-- **Multi-tenant**: `CREATE TABLE` sem `tenant_id` em `.sql` bloqueia;
-  skill `multi-tenant-security-reviewer`.
-- **n8n/Evolution**: webhooks sem idempotência aparente bloqueiam; skill
-  `webhook-idempotency-reviewer` / `n8n-evolution-workflow`.
-- **Next.js**: lint/typecheck/build/test entram nas validações
-  automáticas (scripts ausentes viram `skipped`, sem falhar à toa).
+Adapters **nunca** são instalados automaticamente — nem em detecção de
+alta confiança; o `doctor` apenas sugere.
 
 ## Fluxo recomendado com o Codex
 

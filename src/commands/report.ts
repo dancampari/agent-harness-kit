@@ -4,8 +4,24 @@ import { resolveProjectPaths, rel } from "../core/paths.js";
 import { loadConfig } from "../core/config.js";
 import { ensureDir, pathExists, readText, writeFileSafe } from "../core/file-system.js";
 import { readAcceptanceStatus, timestampedReportName } from "../core/validators.js";
+import { profileProject } from "../core/profiler.js";
+import { resolveValidationCommands } from "../core/validationResolve.js";
 import { readableStamp } from "../core/date.js";
 import { logger } from "../core/logger.js";
+
+async function countInstalledSkills(skillsDir: string): Promise<number> {
+  if (!(await fs.pathExists(skillsDir))) return 0;
+  let n = 0;
+  async function walk(d: string): Promise<void> {
+    for (const e of (await fs.readdir(d, { withFileTypes: true })) as fs.Dirent[]) {
+      const full = path.join(d, e.name);
+      if (e.isDirectory()) await walk(full);
+      else if (e.name === "SKILL.md") n += 1;
+    }
+  }
+  await walk(skillsDir);
+  return n;
+}
 
 async function section(title: string, file: string): Promise<string> {
   if (!(await pathExists(file))) {
@@ -41,6 +57,63 @@ export async function runReport(): Promise<void> {
     ? (await readText(latestValidation)).trim()
     : "_(sem validação registrada — rode `harness validate`)_";
 
+  const profile = await profileProject(cwd).catch(() => null);
+  const resolved = await resolveValidationCommands(config, cwd);
+  const skillCount = await countInstalledSkills(paths.skillsDir);
+
+  const stackBlock = profile
+    ? [
+        `## Stack detectada\n`,
+        `- Linguagem: ${profile.language}`,
+        `- Gerenciador: ${profile.packageManager ?? "—"}`,
+        `- Framework: ${profile.framework ?? "—"}`,
+        `- Sinais: ${[
+          profile.hasTests && "testes",
+          profile.hasDocker && "docker",
+          profile.hasCI && "ci/cd",
+          profile.hasDatabase && "banco",
+          profile.hasFrontend && "frontend",
+          profile.hasBackend && "backend",
+        ]
+          .filter(Boolean)
+          .join(", ") || "—"}`,
+        "",
+      ].join("\n")
+    : "## Stack detectada\n\n_(não detectada)_\n";
+
+  const skillsBlock = [
+    `## Skills e adapters\n`,
+    `- Skills instaladas: ${skillCount}`,
+    `- Adapters instalados: ${
+      config.installedAdapters.length
+        ? config.installedAdapters.join(", ")
+        : "nenhum"
+    }`,
+    `- Adapters sugeridos: ${
+      profile?.suggestedAdapters.length
+        ? profile.suggestedAdapters
+            .map((a) => `${a.name} (${a.confidence})`)
+            .join(", ")
+        : "nenhum"
+    }`,
+    "",
+  ].join("\n");
+
+  const valBlock = [
+    `## Validações disponíveis (${resolved.source})\n`,
+    Object.entries(resolved.commands).length
+      ? Object.entries(resolved.commands)
+          .map(([k, v]) => `- ${k}: \`${v}\``)
+          .join("\n")
+      : "_(nenhuma detectada/configurada)_",
+    "",
+    profile && profile.risks.length
+      ? `### Riscos universais\n\n${profile.risks
+          .map((r) => `- ${r}`)
+          .join("\n")}\n`
+      : "",
+  ].join("\n");
+
   const parts: string[] = [
     `# Relatório Consolidado`,
     "",
@@ -52,6 +125,9 @@ export async function runReport(): Promise<void> {
         : "ausente"
     }`,
     "",
+    stackBlock,
+    skillsBlock,
+    valBlock,
     await section("Tarefa atual", paths.currentTask),
     await section("Critérios de aceite", paths.acceptanceCriteria),
     `## Validações executadas\n\n${validationSummary}\n`,

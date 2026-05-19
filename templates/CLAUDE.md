@@ -12,8 +12,10 @@ obrigatórias, regras não negociáveis e definição de pronto.
 
 ## Especificidades do Claude Code
 
-- **Skills**: disponíveis em `.claude/skills/<nome>/SKILL.md`. Use a skill
-  adequada à tarefa e respeite "Quando não usar".
+- **Skills**: universais em `.claude/skills/<categoria>/<skill>/SKILL.md`
+  (core, engineering, architecture, quality, security, data, frontend,
+  api, operations, agent-behavior). Skills de stack só via adapter
+  (`harness adapter add <nome>`). Respeite "Quando não usar".
 - **Hooks**: configurados via `.claude/settings.json`
   (exemplo em `.claude/settings.example.json`). Eles são guarda-rails
   leves — não substituem `harness validate` / `harness done`.

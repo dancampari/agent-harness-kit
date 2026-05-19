@@ -1,184 +1,60 @@
 #!/usr/bin/env node
 import {
+  HOOK_FILES,
   addChangedFiles,
   appendCommandLog,
   appendEvent,
+  appendText,
   backupStamp,
   createRun,
   defaultConfig,
   elapsedLabel,
+  ensureDir,
+  ensureDirWithKeep,
   fileStamp,
-  getTemplatesDir,
   inferProjectName,
+  listAdapterSkillTemplates,
+  listAdapters,
+  listCoreSkillTemplates,
   listRuns,
   loadConfig,
   loadSnapshot,
+  logger,
+  materializeTemplate,
   parseAgentTargets,
+  pathExists,
+  profileProject,
   readActiveRun,
+  readAdapterManifest,
   readCurrentRun,
   readEvents,
   readPackageName,
   readPackageScripts,
+  readTemplate,
+  readText,
   readableStamp,
   rel,
+  renderTemplate,
   resolveConfigured,
   resolveProjectPaths,
   runReportPath,
   setRunStatus,
+  skillSubPath,
+  spinner,
   updateRun,
+  withQuietLogger,
+  writeFileSafe,
+  writeJson,
   writeValidationJson
-} from "./chunk-6WZQTTLJ.js";
+} from "./chunk-IYJTMBC7.js";
 
 // src/cli.ts
 import { Command } from "commander";
-import chalk8 from "chalk";
-
-// src/core/logger.ts
-import chalk from "chalk";
-import ora from "ora";
-function stamp() {
-  return chalk.dim((/* @__PURE__ */ new Date()).toISOString().slice(11, 19));
-}
-var quiet = false;
-async function withQuietLogger(fn) {
-  const previous = quiet;
-  quiet = true;
-  try {
-    return await fn();
-  } finally {
-    quiet = previous;
-  }
-}
-var logger = {
-  info(message) {
-    if (quiet) return;
-    console.log(`${stamp()} ${chalk.cyan("\u2139")} ${message}`);
-  },
-  success(message) {
-    if (quiet) return;
-    console.log(`${stamp()} ${chalk.green("\u2714")} ${message}`);
-  },
-  warn(message) {
-    if (quiet) return;
-    console.warn(`${stamp()} ${chalk.yellow("\u26A0")} ${message}`);
-  },
-  error(message) {
-    console.error(`${stamp()} ${chalk.red("\u2716")} ${message}`);
-  },
-  step(message) {
-    if (quiet) return;
-    console.log(`${stamp()} ${chalk.magenta("\u279C")} ${message}`);
-  },
-  title(message) {
-    if (quiet) return;
-    console.log(`
-${chalk.bold.underline(message)}`);
-  },
-  plain(message = "") {
-    if (quiet) return;
-    console.log(message);
-  },
-  hint(message) {
-    if (quiet) return;
-    console.log(`  ${chalk.dim(message)}`);
-  }
-};
-function spinner(text2) {
-  return ora({ text: text2, color: "cyan", isSilent: quiet });
-}
+import chalk9 from "chalk";
 
 // src/commands/init.ts
-import fs3 from "fs-extra";
-import path3 from "path";
-
-// src/core/file-system.ts
 import fs from "fs-extra";
 import path from "path";
-async function ensureDir(dir) {
-  await fs.ensureDir(dir);
-}
-async function ensureDirWithKeep(dir) {
-  await fs.ensureDir(dir);
-  const keep = path.join(dir, ".gitkeep");
-  if (!await fs.pathExists(keep)) {
-    await fs.writeFile(keep, "");
-  }
-}
-async function pathExists(target) {
-  return fs.pathExists(target);
-}
-async function readText(target) {
-  return fs.readFile(target, "utf8");
-}
-async function writeFileSafe(target, content, force = false) {
-  const exists = await fs.pathExists(target);
-  if (!exists) {
-    await fs.ensureDir(path.dirname(target));
-    await fs.writeFile(target, content);
-    return { path: target, action: "created" };
-  }
-  if (!force) {
-    logger.warn(
-      `J\xE1 existe: ${path.basename(target)} \u2014 preservado (use --force para sobrescrever com backup).`
-    );
-    return { path: target, action: "skipped" };
-  }
-  const backupPath = `${target}.bak-${backupStamp()}`;
-  await fs.copy(target, backupPath);
-  await fs.writeFile(target, content);
-  logger.warn(
-    `Sobrescrito: ${path.basename(target)} (backup em ${path.basename(backupPath)}).`
-  );
-  return { path: target, action: "overwritten", backupPath };
-}
-async function appendText(target, content) {
-  await fs.ensureDir(path.dirname(target));
-  if (!await fs.pathExists(target)) {
-    await fs.writeFile(target, content);
-    return;
-  }
-  await fs.appendFile(target, content);
-}
-async function writeJson(target, data) {
-  await fs.ensureDir(path.dirname(target));
-  await fs.writeJson(target, data, { spaces: 2 });
-}
-
-// src/core/templates.ts
-import path2 from "path";
-import fs2 from "fs-extra";
-async function readTemplate(relPath) {
-  const full = path2.join(getTemplatesDir(), relPath);
-  if (!await fs2.pathExists(full)) {
-    throw new Error(`Template ausente: ${relPath}`);
-  }
-  return fs2.readFile(full, "utf8");
-}
-function renderTemplate(content, vars) {
-  return content.replace(/\{\{\s*([A-Z0-9_]+)\s*\}\}/g, (match, key) => {
-    return key in vars ? vars[key] : match;
-  });
-}
-async function materializeTemplate(relPath, target, vars = {}, force = false) {
-  const raw = await readTemplate(relPath);
-  const content = renderTemplate(raw, vars);
-  return writeFileSafe(target, content, force);
-}
-var SKILL_DIRS = [
-  "nextjs-supabase-builder",
-  "supabase-rls-reviewer",
-  "n8n-evolution-workflow",
-  "qa-before-done",
-  "multi-tenant-security-reviewer",
-  "webhook-idempotency-reviewer"
-];
-var HOOK_FILES = [
-  "pre_tool_use_policy.ts",
-  "post_tool_use_review.ts",
-  "stop_validate_done.ts"
-];
-
-// src/commands/init.ts
 async function runInit(options) {
   const cwd = process.cwd();
   const force = Boolean(options.force);
@@ -195,6 +71,8 @@ async function runInit(options) {
   await ensureDirWithKeep(paths.reportsDir);
   await ensureDirWithKeep(paths.evalsDir);
   await ensureDirWithKeep(paths.skillsDir);
+  await ensureDirWithKeep(path.join(paths.harnessDir, "adapters", "available"));
+  await ensureDirWithKeep(path.join(paths.harnessDir, "adapters", "installed"));
   if (targets.includes("codex")) await ensureDirWithKeep(paths.codexHooksDir);
   if (targets.includes("claude-code")) {
     await ensureDirWithKeep(paths.claudeSkillsDir);
@@ -204,7 +82,7 @@ async function runInit(options) {
   const configExists = await pathExists(paths.configFile);
   if (!configExists || force) {
     if (configExists && force) {
-      await fs3.copy(paths.configFile, `${paths.configFile}.bak-${Date.now()}`);
+      await fs.copy(paths.configFile, `${paths.configFile}.bak-${Date.now()}`);
       logger.warn("harness.config.json sobrescrito (backup criado).");
     }
     await writeJson(paths.configFile, defaultConfig(projectName, targets));
@@ -235,8 +113,8 @@ async function runInit(options) {
     if (r.action === "created") logger.success(`Criado ${rel(cwd, target)}`);
   }
   const evals = [
-    ["evals/regression-cases.yaml", path3.join(paths.evalsDir, "regression-cases.yaml")],
-    ["evals/acceptance-tests.yaml", path3.join(paths.evalsDir, "acceptance-tests.yaml")]
+    ["evals/regression-cases.yaml", path.join(paths.evalsDir, "regression-cases.yaml")],
+    ["evals/acceptance-tests.yaml", path.join(paths.evalsDir, "acceptance-tests.yaml")]
   ];
   for (const [tpl, target] of evals) {
     const r = await materializeTemplate(tpl, target, vars, force);
@@ -246,18 +124,23 @@ async function runInit(options) {
     const r = await materializeTemplate("AGENTS.md", paths.agentsFile, vars, force);
     if (r.action === "created") logger.success(`Criado ${rel(cwd, paths.agentsFile)}`);
   }
-  for (const skill of SKILL_DIRS) {
-    const target = path3.join(paths.skillsDir, skill, "SKILL.md");
-    const r = await materializeTemplate(`skills/${skill}/SKILL.md`, target, vars, force);
-    if (r.action === "created") logger.success(`Criado ${rel(cwd, target)}`);
+  const coreSkills = await listCoreSkillTemplates();
+  let coreCreated = 0;
+  for (const relTpl of coreSkills) {
+    const target = path.join(paths.skillsDir, skillSubPath(relTpl));
+    const r = await materializeTemplate(relTpl, target, vars, force);
+    if (r.action === "created") coreCreated += 1;
   }
+  logger.success(
+    `${coreCreated} skill(s) universal(is) instalada(s) em ${rel(cwd, paths.skillsDir)} (${coreSkills.length} no cat\xE1logo)`
+  );
   if (targets.includes("codex")) {
     for (const hook of HOOK_FILES) {
-      const target = path3.join(paths.codexHooksDir, hook);
+      const target = path.join(paths.codexHooksDir, hook);
       const r2 = await materializeTemplate(`hooks/${hook}`, target, vars, force);
       if (r2.action === "created") logger.success(`Criado ${rel(cwd, target)}`);
     }
-    const codexExample = path3.join(paths.codexDir, "hooks.example.json");
+    const codexExample = path.join(paths.codexDir, "hooks.example.json");
     const r = await materializeTemplate(
       "hooks/codex-hooks.example.json",
       codexExample,
@@ -276,22 +159,21 @@ async function runInit(options) {
     if (claudeMd.action === "created") {
       logger.success(`Criado ${rel(cwd, paths.claudeFile)}`);
     }
-    for (const skill of SKILL_DIRS) {
-      const target = path3.join(paths.claudeSkillsDir, skill, "SKILL.md");
-      const r2 = await materializeTemplate(
-        `skills/${skill}/SKILL.md`,
-        target,
-        vars,
-        force
-      );
-      if (r2.action === "created") logger.success(`Criado ${rel(cwd, target)}`);
+    let claudeSkills = 0;
+    for (const relTpl of coreSkills) {
+      const target = path.join(paths.claudeSkillsDir, skillSubPath(relTpl));
+      const r2 = await materializeTemplate(relTpl, target, vars, force);
+      if (r2.action === "created") claudeSkills += 1;
     }
+    logger.success(
+      `${claudeSkills} skill(s) em ${rel(cwd, paths.claudeSkillsDir)}`
+    );
     for (const hook of HOOK_FILES) {
-      const target = path3.join(paths.claudeHooksDir, hook);
+      const target = path.join(paths.claudeHooksDir, hook);
       const r2 = await materializeTemplate(`claude/hooks/${hook}`, target, vars, force);
       if (r2.action === "created") logger.success(`Criado ${rel(cwd, target)}`);
     }
-    const settingsExample = path3.join(paths.claudeDir, "settings.example.json");
+    const settingsExample = path.join(paths.claudeDir, "settings.example.json");
     const r = await materializeTemplate(
       "claude/settings.example.json",
       settingsExample,
@@ -316,13 +198,13 @@ async function runInit(options) {
 }
 
 // src/commands/install.ts
-import fs6 from "fs-extra";
+import fs4 from "fs-extra";
 import * as p from "@clack/prompts";
-import chalk4 from "chalk";
+import chalk3 from "chalk";
 
 // src/core/projectDetect.ts
-import path4 from "path";
-import fs4 from "fs-extra";
+import path2 from "path";
+import fs2 from "fs-extra";
 async function detectPackageManager(cwd) {
   const checks = [
     ["pnpm-lock.yaml", "pnpm"],
@@ -331,7 +213,7 @@ async function detectPackageManager(cwd) {
     ["package-lock.json", "npm"]
   ];
   for (const [file, pm] of checks) {
-    if (await fs4.pathExists(path4.join(cwd, file))) return pm;
+    if (await fs2.pathExists(path2.join(cwd, file))) return pm;
   }
   return "pnpm";
 }
@@ -350,13 +232,13 @@ function buildValidation(pm) {
 }
 async function detectProject(cwd) {
   const base = resolveProjectPaths(cwd);
-  const hasPackageJson = await fs4.pathExists(base.packageJson);
+  const hasPackageJson = await fs2.pathExists(base.packageJson);
   const pkgName = await readPackageName(base.packageJson);
   const scripts = await readPackageScripts(base.packageJson);
-  const existingConfig = await fs4.pathExists(base.configFile) ? await loadConfig(base.configFile).catch(() => null) : null;
+  const existingConfig = await fs2.pathExists(base.configFile) ? await loadConfig(base.configFile).catch(() => null) : null;
   return {
     cwd,
-    projectName: existingConfig?.projectName || pkgName || path4.basename(cwd),
+    projectName: existingConfig?.projectName || pkgName || path2.basename(cwd),
     packageManager: existingConfig?.packageManager ?? await detectPackageManager(cwd),
     hasPackageJson,
     scripts,
@@ -371,13 +253,13 @@ var ALL_TARGETS = [
 ];
 
 // src/commands/exportCodex.ts
-import path5 from "path";
-import chalk2 from "chalk";
+import path3 from "path";
+import chalk from "chalk";
 var CODEX_INSTRUCTION = 'codex "Leia AGENTS.md e .harness/current-task.md. Implemente a tarefa seguindo as skills dispon\xEDveis e s\xF3 considere conclu\xEDdo ap\xF3s cumprir .harness/acceptance-criteria.md."';
 async function runExportCodex() {
   const cwd = process.cwd();
   const config = await loadConfig(
-    path5.join(cwd, ".harness", "harness.config.json")
+    path3.join(cwd, ".harness", "harness.config.json")
   ).catch(() => null);
   if (!config) {
     logger.error("harness.config.json n\xE3o encontrado. Rode `harness init` primeiro.");
@@ -399,10 +281,10 @@ async function runExportCodex() {
     logger.success(`Criado ${rel(cwd, paths.agentsFile)}`);
   }
   let createdSkills = 0;
-  for (const skill of SKILL_DIRS) {
-    const target = path5.join(paths.skillsDir, skill, "SKILL.md");
+  for (const relTpl of await listCoreSkillTemplates()) {
+    const target = path3.join(paths.skillsDir, skillSubPath(relTpl));
     if (await pathExists(target)) continue;
-    await materializeTemplate(`skills/${skill}/SKILL.md`, target, vars, false);
+    await materializeTemplate(relTpl, target, vars, false);
     createdSkills += 1;
   }
   logger.success(
@@ -410,12 +292,12 @@ async function runExportCodex() {
   );
   let createdHooks = 0;
   for (const hook of HOOK_FILES) {
-    const target = path5.join(paths.codexHooksDir, hook);
+    const target = path3.join(paths.codexHooksDir, hook);
     if (await pathExists(target)) continue;
     await materializeTemplate(`hooks/${hook}`, target, vars, false);
     createdHooks += 1;
   }
-  const hooksExample = path5.join(paths.codexDir, "hooks.example.json");
+  const hooksExample = path3.join(paths.codexDir, "hooks.example.json");
   if (!await pathExists(hooksExample)) {
     await materializeTemplate(
       "hooks/codex-hooks.example.json",
@@ -429,7 +311,7 @@ async function runExportCodex() {
     createdHooks === 0 ? `Hooks j\xE1 presentes em ${rel(cwd, paths.codexHooksDir)}` : `${createdHooks} arquivo(s) de hook criado(s) em ${rel(cwd, paths.codexHooksDir)}`
   );
   logger.title("Agora execute:");
-  logger.plain(chalk2.greenBright(CODEX_INSTRUCTION));
+  logger.plain(chalk.greenBright(CODEX_INSTRUCTION));
   logger.plain();
   logger.hint(
     "Os hooks em .codex/ s\xE3o exemplos. Configure-os manualmente no Codex (veja .codex/hooks.example.json). A CLI n\xE3o altera sua m\xE1quina globalmente."
@@ -437,13 +319,13 @@ async function runExportCodex() {
 }
 
 // src/commands/exportClaude.ts
-import path6 from "path";
-import chalk3 from "chalk";
+import path4 from "path";
+import chalk2 from "chalk";
 var CLAUDE_INSTRUCTION = 'claude "Leia CLAUDE.md e .harness/current-task.md. Implemente a tarefa seguindo as skills em .claude/skills/ e s\xF3 considere conclu\xEDdo ap\xF3s cumprir .harness/acceptance-criteria.md e rodar harness validate."';
 async function runExportClaude() {
   const cwd = process.cwd();
   const config = await loadConfig(
-    path6.join(cwd, ".harness", "harness.config.json")
+    path4.join(cwd, ".harness", "harness.config.json")
   ).catch(() => null);
   if (!config) {
     logger.error("harness.config.json n\xE3o encontrado. Rode `harness init` primeiro.");
@@ -471,10 +353,10 @@ async function runExportClaude() {
     logger.success(`Criado ${rel(cwd, paths.claudeFile)}`);
   }
   let createdSkills = 0;
-  for (const skill of SKILL_DIRS) {
-    const target = path6.join(paths.claudeSkillsDir, skill, "SKILL.md");
+  for (const relTpl of await listCoreSkillTemplates()) {
+    const target = path4.join(paths.claudeSkillsDir, skillSubPath(relTpl));
     if (await pathExists(target)) continue;
-    await materializeTemplate(`skills/${skill}/SKILL.md`, target, vars, false);
+    await materializeTemplate(relTpl, target, vars, false);
     createdSkills += 1;
   }
   logger.success(
@@ -482,12 +364,12 @@ async function runExportClaude() {
   );
   let createdHooks = 0;
   for (const hook of HOOK_FILES) {
-    const target = path6.join(paths.claudeHooksDir, hook);
+    const target = path4.join(paths.claudeHooksDir, hook);
     if (await pathExists(target)) continue;
     await materializeTemplate(`claude/hooks/${hook}`, target, vars, false);
     createdHooks += 1;
   }
-  const settingsExample = path6.join(paths.claudeDir, "settings.example.json");
+  const settingsExample = path4.join(paths.claudeDir, "settings.example.json");
   if (!await pathExists(settingsExample)) {
     await materializeTemplate(
       "claude/settings.example.json",
@@ -501,7 +383,7 @@ async function runExportClaude() {
     createdHooks === 0 ? `Hooks j\xE1 presentes em ${rel(cwd, paths.claudeHooksDir)}` : `${createdHooks} arquivo(s) de hook criado(s) em ${rel(cwd, paths.claudeHooksDir)}`
   );
   logger.title("Agora execute:");
-  logger.plain(chalk3.greenBright(CLAUDE_INSTRUCTION));
+  logger.plain(chalk2.greenBright(CLAUDE_INSTRUCTION));
   logger.plain();
   logger.hint(
     "Para ativar os hooks: copie .claude/settings.example.json para .claude/settings.json e revise. A CLI n\xE3o altera sua m\xE1quina globalmente."
@@ -509,8 +391,8 @@ async function runExportClaude() {
 }
 
 // src/commands/hooksInstall.ts
-import path7 from "path";
-import fs5 from "fs-extra";
+import path5 from "path";
+import fs3 from "fs-extra";
 var CODEX_WRAPPERS = [
   { file: "harness-post-tool.mjs", subcommand: "hook post-tool" },
   { file: "harness-stop.mjs", subcommand: "hook stop" },
@@ -537,13 +419,13 @@ async function resolvePaths(cwd) {
 async function materializeWrappers(cwd, hooksDir, agent, specs, force) {
   const template = await readTemplate("integrations/hook-wrapper.mjs");
   const commandByFile = {};
-  await fs5.ensureDir(hooksDir);
+  await fs3.ensureDir(hooksDir);
   for (const spec of specs) {
     const content = renderTemplate(template, {
       SUBCOMMAND: spec.subcommand,
       AGENT: agent
     });
-    const target = path7.join(hooksDir, spec.file);
+    const target = path5.join(hooksDir, spec.file);
     const result = await writeFileSafe(target, content, force);
     if (result.action === "created") {
       logger.success(`Criado ${rel(cwd, target)}`);
@@ -553,9 +435,9 @@ async function materializeWrappers(cwd, hooksDir, agent, specs, force) {
   return commandByFile;
 }
 async function backupIfExists(file) {
-  if (!await fs5.pathExists(file)) return null;
+  if (!await fs3.pathExists(file)) return null;
   const backup = `${file}.bak-${backupStamp()}`;
-  await fs5.copy(file, backup);
+  await fs3.copy(file, backup);
   return backup;
 }
 function commandAlreadyWired(list, command) {
@@ -585,8 +467,8 @@ async function runHooksInstallCodex(options) {
   const backup = await backupIfExists(paths.codexHooksConfig);
   if (backup) logger.warn(`Backup: ${rel(cwd, backup)}`);
   let json = {};
-  if (await fs5.pathExists(paths.codexHooksConfig)) {
-    json = await fs5.readJson(paths.codexHooksConfig).catch(() => ({}));
+  if (await fs3.pathExists(paths.codexHooksConfig)) {
+    json = await fs3.readJson(paths.codexHooksConfig).catch(() => ({}));
   }
   let added = 0;
   if (ensureGroup(json, "PostToolUse", commands["harness-post-tool.mjs"], "*"))
@@ -599,8 +481,8 @@ async function runHooksInstallCodex(options) {
     "*"
   ))
     added += 1;
-  await fs5.ensureDir(path7.dirname(paths.codexHooksConfig));
-  await fs5.writeJson(paths.codexHooksConfig, json, { spaces: 2 });
+  await fs3.ensureDir(path5.dirname(paths.codexHooksConfig));
+  await fs3.writeJson(paths.codexHooksConfig, json, { spaces: 2 });
   logger.success(
     `${rel(cwd, paths.codexHooksConfig)} atualizado (${added} hook(s) novo(s), existentes preservados).`
   );
@@ -627,8 +509,8 @@ async function runHooksInstallClaude(options) {
   const backup = await backupIfExists(paths.claudeSettings);
   if (backup) logger.warn(`Backup: ${rel(cwd, backup)}`);
   let settings = {};
-  if (await fs5.pathExists(paths.claudeSettings)) {
-    settings = await fs5.readJson(paths.claudeSettings).catch(() => ({}));
+  if (await fs3.pathExists(paths.claudeSettings)) {
+    settings = await fs3.readJson(paths.claudeSettings).catch(() => ({}));
   }
   let added = 0;
   if (ensureGroup(settings, "PostToolUse", commands["harness-post-tool.mjs"], "*"))
@@ -641,8 +523,8 @@ async function runHooksInstallClaude(options) {
     ""
   ))
     added += 1;
-  await fs5.ensureDir(path7.dirname(paths.claudeSettings));
-  await fs5.writeJson(paths.claudeSettings, settings, { spaces: 2 });
+  await fs3.ensureDir(path5.dirname(paths.claudeSettings));
+  await fs3.writeJson(paths.claudeSettings, settings, { spaces: 2 });
   logger.success(
     `${rel(cwd, paths.claudeSettings)} atualizado (${added} hook(s) novo(s), config existente preservada).`
   );
@@ -672,21 +554,21 @@ async function planNonInteractive(cwd, options) {
     projectName: info.projectName,
     packageManager: pm,
     targets,
-    validation: info.existingConfig?.validation ?? buildValidation(pm),
+    validation: info.existingConfig?.validation ?? { autoDetect: true, commands: {} },
     installHooks: options.hooks !== false && supportsHooks(targets),
     force: Boolean(options.force)
   };
 }
 async function planInteractive(cwd, options) {
   const info = await detectProject(cwd);
-  p.intro(chalk4.bgCyan(chalk4.black(" agent-harness-kit \xB7 install ")));
+  p.intro(chalk3.bgCyan(chalk3.black(" agent-harness-kit \xB7 install ")));
   p.note(
     [
-      `Projeto      : ${chalk4.bold(info.projectName)}`,
+      `Projeto      : ${chalk3.bold(info.projectName)}`,
       `Diret\xF3rio    : ${cwd}`,
-      `package.json : ${info.hasPackageJson ? "encontrado" : chalk4.yellow("ausente")}`,
+      `package.json : ${info.hasPackageJson ? "encontrado" : chalk3.yellow("ausente")}`,
       `Gerenciador  : ${info.packageManager} (detectado)`,
-      info.alreadyInitialized ? chalk4.yellow("J\xE1 inicializado \u2014 arquivos existentes ser\xE3o preservados.") : "Projeto novo para o harness."
+      info.alreadyInitialized ? chalk3.yellow("J\xE1 inicializado \u2014 arquivos existentes ser\xE3o preservados.") : "Projeto novo para o harness."
     ].join("\n"),
     "Diagn\xF3stico"
   );
@@ -715,15 +597,15 @@ async function planInteractive(cwd, options) {
   });
   if (p.isCancel(pmAnswer)) cancelAndExit();
   const packageManager = pmAnswer;
-  const defaults = buildValidation(packageManager);
-  const useDefaults = await p.confirm({
-    message: `Usar comandos de valida\xE7\xE3o padr\xE3o do ${packageManager}? (ex.: "${defaults.lint}")`,
+  const autoDetectAnswer = await p.confirm({
+    message: "Detectar os comandos de valida\xE7\xE3o automaticamente? (recomendado \u2014 universal, sem assumir stack)",
     initialValue: true
   });
-  if (p.isCancel(useDefaults)) cancelAndExit();
-  let validation = { ...defaults };
-  if (!useDefaults) {
-    const custom = {};
+  if (p.isCancel(autoDetectAnswer)) cancelAndExit();
+  let validation = { autoDetect: true, commands: {} };
+  if (autoDetectAnswer !== true) {
+    const defaults = buildValidation(packageManager);
+    const commands = {};
     for (const key of ["lint", "typecheck", "build", "test"]) {
       const ans = await p.text({
         message: `Comando para "${key}" (vazio = n\xE3o usar)`,
@@ -731,9 +613,9 @@ async function planInteractive(cwd, options) {
       });
       if (p.isCancel(ans)) cancelAndExit();
       const value = String(ans).trim();
-      if (value) custom[key] = value;
+      if (value) commands[key] = value;
     }
-    validation = custom;
+    validation = { autoDetect: false, commands };
   }
   let installHooks = false;
   if (supportsHooks(targets)) {
@@ -767,7 +649,7 @@ async function planInteractive(cwd, options) {
       `Projeto      : ${plan.projectName}`,
       `Agentes      : ${labels}`,
       `Gerenciador  : ${plan.packageManager}`,
-      `Valida\xE7\xF5es   : ${Object.entries(plan.validation).map(([k, v]) => `${k}="${v}"`).join("  ")}`,
+      `Valida\xE7\xF5es   : ${plan.validation.autoDetect ? "autoDetect (universal)" : Object.entries(plan.validation.commands).map(([k, v]) => `${k}="${v}"`).join("  ") || "(nenhuma)"}`,
       `Hooks        : ${plan.installHooks ? "instalar" : "n\xE3o"}`,
       `Arquivos     : ${plan.force ? "sobrescrever (backup)" : "preservar existentes"}`
     ].join("\n"),
@@ -796,7 +678,7 @@ async function applyPlan(cwd, plan) {
   config.packageManager = plan.packageManager;
   config.validation = plan.validation;
   config.agentTargets = plan.targets;
-  await fs6.writeJson(paths.configFile, config, { spaces: 2 });
+  await fs4.writeJson(paths.configFile, config, { spaces: 2 });
   s.stop("harness.config.json configurado");
   if (plan.targets.includes("codex")) {
     s.start("Exportando para o Codex\u2026");
@@ -862,20 +744,70 @@ async function runInstall(options) {
   p.note(created.map((c) => `\u2714 ${c}`).join("\n"), "Instalado");
   const agentForRun = plan.targets.includes("claude-code") ? "claude" : plan.targets.includes("codex") ? "codex" : "manual";
   p.outro(
-    chalk4.green("Pronto! ") + `Comece com:  ${chalk4.cyan(
+    chalk3.green("Pronto! ") + `Comece com:  ${chalk3.cyan(
       `harness feature start "<nome>" --agent ${agentForRun}`
-    )}  e acompanhe com  ${chalk4.cyan("harness ui")}.`
+    )}  e acompanhe com  ${chalk3.cyan("harness ui")}.`
   );
 }
 
 // src/commands/task.ts
-import path8 from "path";
-import fs7 from "fs-extra";
+import path6 from "path";
+import fs5 from "fs-extra";
 function slugify(input) {
   const deaccented = input.normalize("NFD").replace(new RegExp("\\p{Diacritic}", "gu"), "");
   return deaccented.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 50);
 }
-function currentTaskDoc(description) {
+async function installedSkillNames(skillsDir) {
+  const names = /* @__PURE__ */ new Set();
+  if (!await fs5.pathExists(skillsDir)) return names;
+  async function walk(d) {
+    for (const e of await fs5.readdir(d, { withFileTypes: true })) {
+      const full = path6.join(d, e.name);
+      if (e.isDirectory()) await walk(full);
+      else if (e.name === "SKILL.md")
+        names.add(path6.basename(path6.dirname(full)));
+    }
+  }
+  await walk(skillsDir);
+  return names;
+}
+var ALWAYS = [
+  "project-discovery",
+  "requirements-analysis",
+  "implementation-plan",
+  "validation-before-done",
+  "no-premature-victory",
+  "report-builder"
+];
+var KEYWORD_MAP = [
+  [/\b(api|endpoint|rest|graphql|rpc|integ)/i, ["api-contract-review", "integration-error-handling"]],
+  [/\b(webhook|callback|evento|event)/i, ["webhook-safety", "idempotency-review"]],
+  [/\b(retry|timeout|resili|backoff)/i, ["retry-policy-review"]],
+  [/\b(test|teste|spec|cobertura|coverage)/i, ["test-strategy", "regression-check"]],
+  [/\b(refator|refactor|reescr|rewrite)/i, ["safe-refactor", "regression-check"]],
+  [/\b(secur|seguran|auth|login|senha|token|jwt|permiss|rbac)/i, ["security-review", "auth-boundary-review", "permission-review", "input-validation"]],
+  [/\b(secret|chave|api[_-]?key|credencial)/i, ["secrets-protection"]],
+  [/\b(migrat|schema|banco|database|\bsql\b|tabela|model)/i, ["data-model-review", "migration-safety", "transaction-review"]],
+  [/\b(ui|tela|form|formul|component|frontend|css|layout|acess)/i, ["form-validation-review", "accessibility-review", "loading-empty-error-states", "responsive-design-review"]],
+  [/\b(deploy|release|ci\b|cd\b|pipeline|publish)/i, ["deployment-readiness", "ci-cd-review", "build-readiness"]],
+  [/\b(depend|pacote|package|lib|biblioteca|upgrade)/i, ["dependency-management"]],
+  [/\b(config|env|ambiente|variá|setting)/i, ["configuration-management"]],
+  [/\b(log|observ|metric|trace|monitor)/i, ["logging-review", "observability-review"]],
+  [/\b(arquitet|architecture|modul|acopl|boundary|contrato)/i, ["architecture-review", "modularity-review", "interface-contracts", "separation-of-concerns"]],
+  [/\b(erro|error|exce|falha)/i, ["error-handling"]],
+  [/\b(duplica|complex|legível|legivel|clean)/i, ["clean-code-review", "complexity-review", "duplication-review"]]
+];
+function suggestSkills(description, installed) {
+  const picked = new Set(ALWAYS.filter((s) => installed.has(s)));
+  for (const [re, skills] of KEYWORD_MAP) {
+    if (re.test(description)) {
+      for (const s of skills) if (installed.has(s)) picked.add(s);
+    }
+  }
+  return [...picked];
+}
+function currentTaskDoc(description, suggested, stackLine) {
+  const list = suggested.length > 0 ? suggested.map((s) => `- \`${s}\``).join("\n") : "- (nenhuma sugerida automaticamente \u2014 selecione manualmente)";
   return `# Tarefa Atual
 
 > Atualizado em ${readableStamp()}
@@ -884,9 +816,13 @@ function currentTaskDoc(description) {
 
 ${description}
 
+## Stack detectada
+
+${stackLine}
+
 ## Contexto
 
-- (Preencha: por que esta tarefa existe, de onde veio a demanda)
+- (Por que esta tarefa existe, de onde veio a demanda)
 
 ## Escopo
 
@@ -898,11 +834,18 @@ ${description}
 
 ## Arquivos prov\xE1veis
 
-- (Liste arquivos/m\xF3dulos que provavelmente ser\xE3o tocados)
+- (Arquivos/m\xF3dulos que provavelmente ser\xE3o tocados)
 
 ## Riscos
 
-- (Liste riscos t\xE9cnicos, de dados, de multi-tenant, de seguran\xE7a)
+- (Riscos t\xE9cnicos, de dados, de seguran\xE7a)
+
+## Skills sugeridas
+
+${list}
+
+> Use tamb\xE9m as skills relevantes em \`.agents/skills/\`. Skills de stack
+> s\xF3 se um adapter estiver instalado (\`harness adapter add <nome>\`).
 
 ## Crit\xE9rios de aceite
 
@@ -910,19 +853,17 @@ Ver e marcar em \`.harness/acceptance-criteria.md\`.
 
 ## Comandos de valida\xE7\xE3o
 
-- lint / typecheck / build / test conforme \`.harness/harness.config.json\`
+Detectados/configurados (ver \`harness doctor\` / \`harness.config.json\`).
 
 ## Defini\xE7\xE3o de pronto
 
-A tarefa s\xF3 est\xE1 pronta quando todos os crit\xE9rios de aceite estiverem
-marcados e \`harness done\` passar sem falhas.
+Todos os crit\xE9rios de aceite marcados e \`harness done\` sem falhas.
 
-## Instru\xE7\xE3o para o Codex
+## Instru\xE7\xE3o para o agente
 
-Leia \`AGENTS.md\` e \`.harness/current-task.md\`. Implemente a tarefa
-seguindo as skills em \`.agents/skills/\`, em passos pequenos, e s\xF3
-considere conclu\xEDdo ap\xF3s cumprir \`.harness/acceptance-criteria.md\` e
-rodar as valida\xE7\xF5es.
+Leia \`AGENTS.md\`/\`CLAUDE.md\` e \`.harness/current-task.md\`. Implemente
+em passos pequenos, valide, e s\xF3 conclua ap\xF3s cumprir
+\`.harness/acceptance-criteria.md\`.
 `;
 }
 function acceptanceDoc(description) {
@@ -936,13 +877,10 @@ Marque \`[x]\` somente quando o crit\xE9rio estiver realmente cumprido e verific
 - [ ] A funcionalidade descrita no objetivo est\xE1 implementada
 - [ ] O comportamento foi validado manualmente ou por teste
 - [ ] Nenhuma funcionalidade existente foi quebrada
-- [ ] Lint executado ou justificado
-- [ ] Typecheck executado ou justificado
-- [ ] Build executado ou justificado
-- [ ] Testes executados ou justificados
-- [ ] Isolamento multi-tenant preservado (se aplic\xE1vel)
-- [ ] RLS/seguran\xE7a Supabase preservados (se aplic\xE1vel)
-- [ ] Webhooks/integra\xE7\xF5es com idempot\xEAncia (se aplic\xE1vel)
+- [ ] Valida\xE7\xF5es dispon\xEDveis executadas (lint/typecheck/build/test) ou justificadas
+- [ ] Tratamento de erro e casos de borda cobertos
+- [ ] Limites de seguran\xE7a/autoriza\xE7\xE3o preservados (se aplic\xE1vel)
+- [ ] Integra\xE7\xF5es externas seguras e idempotentes (se aplic\xE1vel)
 - [ ] Decis\xF5es relevantes registradas em \`.harness/decisions.md\`
 - [ ] Sem segredos hardcoded e sem TODOs cr\xEDticos pendentes
 `;
@@ -961,7 +899,7 @@ ${description}
 
 ## Notas durante a execu\xE7\xE3o
 
-- (O agente/dev registra aqui o progresso e decis\xF5es)
+- (Progresso e decis\xF5es)
 
 ## Resultado
 
@@ -972,12 +910,12 @@ async function runTask(description) {
   const cwd = process.cwd();
   const trimmed = description.trim();
   if (!trimmed) {
-    logger.error('Descri\xE7\xE3o da tarefa vazia. Uso: harness task "descri\xE7\xE3o da tarefa"');
+    logger.error('Descri\xE7\xE3o vazia. Uso: harness task "descri\xE7\xE3o da tarefa"');
     process.exitCode = 1;
     return;
   }
   const config = await loadConfig(
-    path8.join(cwd, ".harness", "harness.config.json")
+    path6.join(cwd, ".harness", "harness.config.json")
   ).catch(() => null);
   const paths = resolveProjectPaths(
     cwd,
@@ -991,29 +929,43 @@ async function runTask(description) {
     return;
   }
   logger.title("harness task");
-  await writeFileSafe(paths.currentTask, currentTaskDoc(trimmed), true);
+  const profile = await profileProject(cwd).catch(() => null);
+  const stackLine = profile ? `- Linguagem: ${profile.language} \xB7 Framework: ${profile.framework ?? "\u2014"} \xB7 Gerenciador: ${profile.packageManager ?? "\u2014"}` : "- (n\xE3o detectada)";
+  const installed = await installedSkillNames(paths.skillsDir);
+  const suggested = suggestSkills(trimmed, installed);
+  await writeFileSafe(
+    paths.currentTask,
+    currentTaskDoc(trimmed, suggested, stackLine),
+    true
+  );
   logger.success(`Atualizado ${rel(cwd, paths.currentTask)}`);
   await writeFileSafe(paths.acceptanceCriteria, acceptanceDoc(trimmed), true);
-  logger.success(`Crit\xE9rios de aceite iniciais em ${rel(cwd, paths.acceptanceCriteria)}`);
+  logger.success(`Crit\xE9rios de aceite em ${rel(cwd, paths.acceptanceCriteria)}`);
   await ensureDir(paths.runsDir);
-  const runFile = path8.join(
+  const runFile = path6.join(
     paths.runsDir,
     `${fileStamp()}-task-${slugify(trimmed) || "task"}.md`
   );
-  await fs7.writeFile(runFile, runDoc(trimmed));
+  await fs5.writeFile(runFile, runDoc(trimmed));
   logger.success(`Run registrada em ${rel(cwd, runFile)}`);
+  logger.title("Skills sugeridas");
+  if (suggested.length === 0) {
+    logger.plain("  (nenhuma \u2014 selecione manualmente em .agents/skills/)");
+  } else {
+    for (const s of suggested) logger.plain(`  \u2022 ${s}`);
+  }
   logger.title("Pr\xF3ximos passos");
-  logger.step("Revise e detalhe .harness/current-task.md (contexto, escopo, riscos).");
+  logger.step("Detalhe .harness/current-task.md (contexto, escopo, riscos).");
   logger.step("Ajuste .harness/acceptance-criteria.md conforme a tarefa.");
-  logger.step("Depois rode: harness export codex");
+  logger.step("Exporte: harness export codex | claude-code");
 }
 
 // src/commands/validate.ts
-import path10 from "path";
+import path8 from "path";
 
 // src/core/validators.ts
-import path9 from "path";
-import fs8 from "fs-extra";
+import path7 from "path";
+import fs6 from "fs-extra";
 
 // src/core/command-runner.ts
 import { execa } from "execa";
@@ -1061,33 +1013,41 @@ async function isToolAvailable(tool) {
   }
 }
 
+// src/core/validationResolve.ts
+async function resolveValidationCommands(config, cwd) {
+  const configured = config.validation?.commands ?? {};
+  if (Object.keys(configured).length > 0) {
+    return { commands: { ...configured }, source: "configured" };
+  }
+  if (config.validation?.autoDetect !== false) {
+    const profile = await profileProject(cwd);
+    if (Object.keys(profile.validationCommands).length > 0) {
+      return { commands: { ...profile.validationCommands }, source: "detected" };
+    }
+  }
+  return { commands: {}, source: "none" };
+}
+
 // src/core/validators.ts
 var VALIDATION_ORDER = ["lint", "typecheck", "build", "test"];
 async function runValidation(config, paths, reportFileName = "latest-validation.md") {
-  const scripts = await readPackageScripts(paths.packageJson);
+  const resolved = await resolveValidationCommands(config, paths.cwd);
+  const commandMap = resolved.commands;
   const steps = [];
   const keys = [
-    ...VALIDATION_ORDER.filter((k) => config.validation[k]),
-    ...Object.keys(config.validation).filter(
+    ...VALIDATION_ORDER.filter((k) => commandMap[k]),
+    ...Object.keys(commandMap).filter(
       (k) => !VALIDATION_ORDER.includes(k)
     )
   ];
+  if (keys.length === 0) {
+    logger.warn(
+      "Nenhum comando de valida\xE7\xE3o detectado/configurado. Defina validation.commands em harness.config.json ou use um adapter."
+    );
+  }
   for (const key of keys) {
-    const command = config.validation[key];
+    const command = commandMap[key];
     if (!command) continue;
-    const hasScript = Object.prototype.hasOwnProperty.call(scripts, key);
-    if (!hasScript) {
-      logger.warn(`"${key}" pulado: script "${key}" n\xE3o existe no package.json.`);
-      steps.push({
-        name: key,
-        command,
-        status: "skipped",
-        exitCode: null,
-        durationMs: 0,
-        skippedReason: `script "${key}" ausente no package.json`
-      });
-      continue;
-    }
     const spin = spinner(`Validando: ${key} (${command})`).start();
     const result = await runCommand(command, paths.cwd);
     if (result.failed) {
@@ -1104,7 +1064,7 @@ async function runValidation(config, paths, reportFileName = "latest-validation.
     });
   }
   const passed = steps.every((s) => s.status !== "failed");
-  const reportPath = path9.join(paths.reportsDir, reportFileName);
+  const reportPath = path7.join(paths.reportsDir, reportFileName);
   await writeValidationReport(reportPath, config, steps, passed);
   return { steps, passed, reportPath };
 }
@@ -1177,24 +1137,24 @@ async function scanCriticalTodos(cwd, maxFiles = 2e3) {
     if (visited >= maxFiles) return;
     let entries;
     try {
-      entries = await fs8.readdir(dir, { withFileTypes: true });
+      entries = await fs6.readdir(dir, { withFileTypes: true });
     } catch {
       return;
     }
     for (const entry of entries) {
-      const full = path9.join(dir, entry.name);
+      const full = path7.join(dir, entry.name);
       if (entry.isDirectory()) {
         if (SCAN_IGNORE.has(entry.name)) continue;
         await walk(full);
-      } else if (SCAN_EXTENSIONS.has(path9.extname(entry.name))) {
+      } else if (SCAN_EXTENSIONS.has(path7.extname(entry.name))) {
         visited += 1;
         if (visited >= maxFiles) return;
         try {
-          const text2 = await fs8.readFile(full, "utf8");
+          const text2 = await fs6.readFile(full, "utf8");
           const matches = text2.match(new RegExp(pattern, "g"));
           if (matches) {
             count += matches.length;
-            files.push(path9.relative(cwd, full).split(path9.sep).join("/"));
+            files.push(path7.relative(cwd, full).split(path7.sep).join("/"));
           }
         } catch {
         }
@@ -1212,7 +1172,7 @@ function timestampedReportName(prefix) {
 async function runValidate() {
   const cwd = process.cwd();
   const config = await loadConfig(
-    path10.join(cwd, ".harness", "harness.config.json")
+    path8.join(cwd, ".harness", "harness.config.json")
   );
   const paths = resolveProjectPaths(
     cwd,
@@ -1240,11 +1200,11 @@ async function runValidate() {
 }
 
 // src/commands/done.ts
-import path11 from "path";
+import path9 from "path";
 async function runDone() {
   const cwd = process.cwd();
   const config = await loadConfig(
-    path11.join(cwd, ".harness", "harness.config.json")
+    path9.join(cwd, ".harness", "harness.config.json")
   );
   const paths = resolveProjectPaths(
     cwd,
@@ -1291,7 +1251,7 @@ async function runDone() {
     });
   }
   const passed = blockers.length === 0;
-  const reportPath = path11.join(paths.reportsDir, "done-report.md");
+  const reportPath = path9.join(paths.reportsDir, "done-report.md");
   await writeDoneReport(reportPath, config.projectName, passed, blockers, {
     acceptance: acceptance.exists ? `${acceptance.checked}/${acceptance.total} marcados` : "ausente",
     validation: validation.passed ? "passou" : "falhou",
@@ -1341,13 +1301,26 @@ marcados, h\xE1 TODOs cr\xEDticos ou h\xE1 arquivos modificados sem explica\xE7\
 }
 
 // src/commands/report.ts
-import path12 from "path";
-import fs9 from "fs-extra";
+import path10 from "path";
+import fs7 from "fs-extra";
+async function countInstalledSkills(skillsDir) {
+  if (!await fs7.pathExists(skillsDir)) return 0;
+  let n = 0;
+  async function walk(d) {
+    for (const e of await fs7.readdir(d, { withFileTypes: true })) {
+      const full = path10.join(d, e.name);
+      if (e.isDirectory()) await walk(full);
+      else if (e.name === "SKILL.md") n += 1;
+    }
+  }
+  await walk(skillsDir);
+  return n;
+}
 async function section(title, file) {
   if (!await pathExists(file)) {
     return `## ${title}
 
-_(arquivo ausente: ${path12.basename(file)})_
+_(arquivo ausente: ${path10.basename(file)})_
 `;
   }
   const text2 = (await readText(file)).trim();
@@ -1359,7 +1332,7 @@ ${text2 || "_(vazio)_"}
 async function runReport() {
   const cwd = process.cwd();
   const config = await loadConfig(
-    path12.join(cwd, ".harness", "harness.config.json")
+    path10.join(cwd, ".harness", "harness.config.json")
   );
   const paths = resolveProjectPaths(
     cwd,
@@ -1370,8 +1343,45 @@ async function runReport() {
   logger.title("harness report");
   await ensureDir(paths.reportsDir);
   const acceptance = await readAcceptanceStatus(paths.acceptanceCriteria);
-  const latestValidation = path12.join(paths.reportsDir, "latest-validation.md");
+  const latestValidation = path10.join(paths.reportsDir, "latest-validation.md");
   const validationSummary = await pathExists(latestValidation) ? (await readText(latestValidation)).trim() : "_(sem valida\xE7\xE3o registrada \u2014 rode `harness validate`)_";
+  const profile = await profileProject(cwd).catch(() => null);
+  const resolved = await resolveValidationCommands(config, cwd);
+  const skillCount = await countInstalledSkills(paths.skillsDir);
+  const stackBlock = profile ? [
+    `## Stack detectada
+`,
+    `- Linguagem: ${profile.language}`,
+    `- Gerenciador: ${profile.packageManager ?? "\u2014"}`,
+    `- Framework: ${profile.framework ?? "\u2014"}`,
+    `- Sinais: ${[
+      profile.hasTests && "testes",
+      profile.hasDocker && "docker",
+      profile.hasCI && "ci/cd",
+      profile.hasDatabase && "banco",
+      profile.hasFrontend && "frontend",
+      profile.hasBackend && "backend"
+    ].filter(Boolean).join(", ") || "\u2014"}`,
+    ""
+  ].join("\n") : "## Stack detectada\n\n_(n\xE3o detectada)_\n";
+  const skillsBlock = [
+    `## Skills e adapters
+`,
+    `- Skills instaladas: ${skillCount}`,
+    `- Adapters instalados: ${config.installedAdapters.length ? config.installedAdapters.join(", ") : "nenhum"}`,
+    `- Adapters sugeridos: ${profile?.suggestedAdapters.length ? profile.suggestedAdapters.map((a) => `${a.name} (${a.confidence})`).join(", ") : "nenhum"}`,
+    ""
+  ].join("\n");
+  const valBlock = [
+    `## Valida\xE7\xF5es dispon\xEDveis (${resolved.source})
+`,
+    Object.entries(resolved.commands).length ? Object.entries(resolved.commands).map(([k, v]) => `- ${k}: \`${v}\``).join("\n") : "_(nenhuma detectada/configurada)_",
+    "",
+    profile && profile.risks.length ? `### Riscos universais
+
+${profile.risks.map((r) => `- ${r}`).join("\n")}
+` : ""
+  ].join("\n");
   const parts = [
     `# Relat\xF3rio Consolidado`,
     "",
@@ -1379,6 +1389,9 @@ async function runReport() {
     `- Gerado em: ${readableStamp()}`,
     `- Crit\xE9rios de aceite: ${acceptance.exists ? `${acceptance.checked}/${acceptance.total} marcados` : "ausente"}`,
     "",
+    stackBlock,
+    skillsBlock,
+    valBlock,
     await section("Tarefa atual", paths.currentTask),
     await section("Crit\xE9rios de aceite", paths.acceptanceCriteria),
     `## Valida\xE7\xF5es executadas
@@ -1390,18 +1403,18 @@ ${validationSummary}
     "## Pr\xF3ximos passos\n\n" + (acceptance.allChecked ? "- Rodar `harness done` e revisar o done-report.\n" : "- Concluir crit\xE9rios de aceite pendentes.\n- Rodar `harness validate` e `harness done`.\n")
   ];
   const reportName = timestampedReportName("report");
-  const reportPath = path12.join(paths.reportsDir, reportName);
+  const reportPath = path10.join(paths.reportsDir, reportName);
   await writeFileSafe(reportPath, parts.join("\n"), true);
-  await fs9.writeFile(
-    path12.join(paths.reportsDir, "latest-report.md"),
+  await fs7.writeFile(
+    path10.join(paths.reportsDir, "latest-report.md"),
     parts.join("\n")
   );
   logger.success(`Relat\xF3rio gerado: ${rel(cwd, reportPath)}`);
-  logger.info(`Atalho: ${rel(cwd, path12.join(paths.reportsDir, "latest-report.md"))}`);
+  logger.info(`Atalho: ${rel(cwd, path10.join(paths.reportsDir, "latest-report.md"))}`);
 }
 
 // src/commands/doctor.ts
-import path13 from "path";
+import path11 from "path";
 async function runDoctor() {
   const cwd = process.cwd();
   const checks = [];
@@ -1427,7 +1440,7 @@ async function runDoctor() {
     });
   };
   await check("package.json", paths.packageJson, "Inicialize o projeto Node (pnpm init).");
-  await check(".git", path13.join(cwd, ".git"), "Inicialize o git: git init.");
+  await check(".git", path11.join(cwd, ".git"), "Inicialize o git: git init.");
   await check("AGENTS.md", paths.agentsFile, "Rode `harness init` (fonte can\xF4nica).");
   await check(".harness/", paths.harnessDir, "Rode `harness init`.");
   await check(".agents/skills/", paths.skillsDir, "Rode `harness init`.");
@@ -1441,13 +1454,6 @@ async function runDoctor() {
     await check(".claude/skills/", paths.claudeSkillsDir, "Rode `harness export claude-code`.");
     await check(".claude/hooks/", paths.claudeHooksDir, "Rode `harness export claude-code`.");
   }
-  const pnpmOk = await isToolAvailable("pnpm");
-  checks.push({
-    label: "pnpm no PATH",
-    ok: pnpmOk,
-    detail: pnpmOk ? "dispon\xEDvel" : "n\xE3o encontrado",
-    ...pnpmOk ? {} : { suggestion: "Instale o pnpm: npm i -g pnpm" }
-  });
   const gitOk = await isToolAvailable("git");
   checks.push({
     label: "git no PATH",
@@ -1455,32 +1461,55 @@ async function runDoctor() {
     detail: gitOk ? "dispon\xEDvel" : "n\xE3o encontrado",
     ...gitOk ? {} : { suggestion: "Instale o Git." }
   });
-  if (await pathExists(paths.configFile)) {
-    try {
-      const config2 = await loadConfig(paths.configFile);
-      const scripts = await readPackageScripts(paths.packageJson);
-      for (const key of Object.keys(config2.validation)) {
-        if (!config2.validation[key]) continue;
-        const present = Object.prototype.hasOwnProperty.call(scripts, key);
-        checks.push({
-          label: `script "${key}" no package.json`,
-          ok: present,
-          detail: present ? "definido" : "ausente",
-          ...present ? {} : {
-            suggestion: `Adicione um script "${key}" ou ajuste validation.${key} no harness.config.json.`
-          }
-        });
-      }
-    } catch (error) {
-      checks.push({
-        label: "harness.config.json v\xE1lido",
-        ok: false,
-        detail: error instanceof Error ? error.message : String(error),
-        suggestion: "Corrija o JSON conforme o schema."
-      });
+  const profile = await profileProject(cwd);
+  logger.plain();
+  logger.title("Projeto detectado");
+  logger.plain(`  Linguagem      : ${profile.language}`);
+  logger.plain(`  Gerenciador    : ${profile.packageManager ?? "\u2014"}`);
+  logger.plain(`  Framework      : ${profile.framework ?? "\u2014"}`);
+  logger.plain(
+    `  Sinais         : ${[
+      profile.hasTests && "testes",
+      profile.hasDocker && "docker",
+      profile.hasCI && "ci/cd",
+      profile.hasDatabase && "banco/migrations",
+      profile.hasFrontend && "frontend",
+      profile.hasBackend && "backend/api"
+    ].filter(Boolean).join(", ") || "nenhum detectado"}`
+  );
+  if (config) {
+    const resolved = await resolveValidationCommands(config, cwd);
+    const entries = Object.entries(resolved.commands);
+    logger.plain();
+    logger.title(`Valida\xE7\xF5es (${resolved.source})`);
+    if (entries.length === 0) {
+      logger.plain("  (nenhuma) \u2014 configure validation.commands ou adicione scripts.");
+    } else {
+      for (const [k, v] of entries) logger.plain(`  ${k}: ${v}`);
     }
   }
   logger.plain();
+  logger.title("Adapters sugeridos");
+  if (profile.suggestedAdapters.length === 0) {
+    logger.plain("  Nenhum (projeto gen\xE9rico ou stack n\xE3o reconhecida).");
+  } else {
+    for (const a of profile.suggestedAdapters) {
+      const installed = config?.installedAdapters?.includes(a.name);
+      logger.plain(
+        `  ${a.name} [confian\xE7a: ${a.confidence}] \u2014 ${a.reason}${installed ? " (instalado)" : ""}`
+      );
+    }
+    logger.hint(
+      "Instale manualmente quando fizer sentido: harness adapter add <nome>"
+    );
+  }
+  if (profile.risks.length > 0) {
+    logger.plain();
+    logger.title("Riscos iniciais");
+    for (const r of profile.risks) logger.plain(`  \u2022 ${r}`);
+  }
+  logger.plain();
+  logger.title("Estrutura");
   let problems = 0;
   for (const c of checks) {
     if (c.ok) {
@@ -1502,92 +1531,96 @@ async function runDoctor() {
 }
 
 // src/commands/skillNew.ts
-import path14 from "path";
+import path12 from "path";
 function normalizeName(raw) {
   return raw.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }
-function skillTemplate(name) {
+function skillTemplate(name, category, risk) {
   return `---
 name: ${name}
-description: Descreva claramente QUANDO usar e QUANDO N\xC3O usar esta skill.
+description: Descreva claramente QUANDO usar esta skill.
+category: ${category}
+risk_level: ${risk}
 ---
 
-# ${name}
+# Objetivo
 
-> Criada em ${readableStamp()}
+(Que problema esta skill resolve e o resultado esperado.)
 
-## Objetivo
-
-(Explique o problema que esta skill resolve e o resultado esperado.)
-
-## Quando usar
+# Quando usar
 
 - (Situa\xE7\xE3o 1)
 - (Situa\xE7\xE3o 2)
 
-## Quando n\xE3o usar
+# Quando n\xE3o usar
 
-- (Situa\xE7\xE3o onde aplicar esta skill seria errado)
+- (Quando aplicar esta skill seria errado)
 - (Quando outra skill \xE9 mais adequada)
 
-## Regras obrigat\xF3rias
+# Regras obrigat\xF3rias
 
 - (Regra inegoci\xE1vel 1)
-- (Regra inegoci\xE1vel 2)
 - N\xE3o introduzir segredos hardcoded
 - N\xE3o quebrar funcionalidades existentes sem justificativa
 - Registrar decis\xF5es relevantes em \`.harness/decisions.md\`
 
-## Checklist de valida\xE7\xE3o
+# Processo
+
+1. (Passo 1)
+2. (Passo 2)
+3. (Passo 3)
+
+# Checklist
 
 - [ ] (Verifica\xE7\xE3o objetiva 1)
 - [ ] (Verifica\xE7\xE3o objetiva 2)
-- [ ] Lint/typecheck/build/test executados ou justificados
+- [ ] Valida\xE7\xF5es dispon\xEDveis executadas ou justificadas
 
-## Exemplos
-
-\`\`\`txt
-(Exemplo de uso correto desta skill)
-\`\`\`
-
-## Anti-padr\xF5es
+# Anti-padr\xF5es
 
 - \u274C (O que N\xC3O fazer 1)
 - \u274C (O que N\xC3O fazer 2)
 `;
 }
-async function runSkillNew(rawName) {
+var VALID_RISK = /* @__PURE__ */ new Set(["low", "medium", "high"]);
+async function runSkillNew(rawName, options) {
   const cwd = process.cwd();
   const name = normalizeName(rawName);
   if (!name) {
-    logger.error("Nome de skill inv\xE1lido. Uso: harness skill new <nome>");
+    logger.error("Nome inv\xE1lido. Uso: harness skill new <nome> [--adapter <stack>]");
     process.exitCode = 1;
     return;
   }
-  const config = await loadConfig(
-    path14.join(cwd, ".harness", "harness.config.json")
-  ).catch(() => null);
-  const paths = resolveProjectPaths(
-    cwd,
-    config?.paths.harness,
-    config?.paths.skills,
-    config?.paths.codexHooks
-  );
-  const target = path14.join(paths.skillsDir, name, "SKILL.md");
+  const risk = VALID_RISK.has(options.risk ?? "") ? options.risk : "medium";
+  const { paths } = await resolveConfigured(cwd);
+  let target;
+  let category;
+  if (options.adapter) {
+    const adapter = normalizeName(options.adapter);
+    category = `adapter:${adapter}`;
+    target = path12.join(paths.skillsDir, "adapters", adapter, name, "SKILL.md");
+  } else {
+    category = normalizeName(options.category ?? "custom") || "custom";
+    target = path12.join(paths.skillsDir, category, name, "SKILL.md");
+  }
   if (await pathExists(target)) {
-    logger.error(`Skill "${name}" j\xE1 existe em ${rel(cwd, target)}.`);
+    logger.error(`Skill j\xE1 existe em ${rel(cwd, target)}.`);
     process.exitCode = 1;
     return;
   }
-  await writeFileSafe(target, skillTemplate(name), false);
+  await writeFileSafe(target, skillTemplate(name, category, risk), false);
   logger.title("harness skill new");
   logger.success(`Skill criada: ${rel(cwd, target)}`);
-  logger.step("Preencha Objetivo, Quando usar/n\xE3o usar, Regras e Anti-padr\xF5es.");
-  logger.hint("Skills bem definidas reduzem erros do agente.");
+  logger.info(`category: ${category} \xB7 risk_level: ${risk}`);
+  if (options.adapter) {
+    logger.hint("Skill de adapter (espec\xEDfica de stack) \u2014 fora do core universal.");
+  } else {
+    logger.hint("Skill universal \u2014 mantenha-a gen\xE9rica e reutiliz\xE1vel.");
+  }
 }
 
 // src/commands/failureAdd.ts
-import path15 from "path";
+import path13 from "path";
 async function runFailureAdd(description) {
   const cwd = process.cwd();
   const trimmed = description.trim();
@@ -1597,7 +1630,7 @@ async function runFailureAdd(description) {
     return;
   }
   const config = await loadConfig(
-    path15.join(cwd, ".harness", "harness.config.json")
+    path13.join(cwd, ".harness", "harness.config.json")
   ).catch(() => null);
   const paths = resolveProjectPaths(
     cwd,
@@ -1633,7 +1666,7 @@ async function runFailureAdd(description) {
 }
 
 // src/commands/featureStart.ts
-import fs10 from "fs-extra";
+import fs8 from "fs-extra";
 function normalizeAgent(value) {
   const v = (value ?? "manual").toLowerCase();
   if (v === "codex") return "codex";
@@ -1662,7 +1695,7 @@ async function runFeatureStart(name, options) {
     return;
   }
   const paths = await resolvePaths2(cwd);
-  if (!await fs10.pathExists(paths.harnessDir)) {
+  if (!await fs8.pathExists(paths.harnessDir)) {
     logger.error("Estrutura .harness/ n\xE3o encontrada. Rode `harness init` primeiro.");
     process.exitCode = 1;
     return;
@@ -1670,7 +1703,7 @@ async function runFeatureStart(name, options) {
   const agent = normalizeAgent(options.agent);
   const run = await createRun(paths, feature, agent);
   await appendEvent(paths, run.runId, "info", agent, `Feature iniciada: ${feature}`);
-  await fs10.writeFile(
+  await fs8.writeFile(
     paths.currentTask,
     `# Tarefa Atual
 
@@ -1873,11 +1906,12 @@ function clamp(text2) {
 \u2026[truncado]` : text2;
 }
 async function runFeatureValidation(config, paths, runId) {
-  const scripts = await readPackageScripts(paths.packageJson);
+  const resolved = await resolveValidationCommands(config, paths.cwd);
+  const commandMap = resolved.commands;
   const keys = [
-    ...ORDER.filter((k) => config.validation[k]),
-    ...Object.keys(config.validation).filter(
-      (k) => !ORDER.includes(k) && config.validation[k]
+    ...ORDER.filter((k) => commandMap[k]),
+    ...Object.keys(commandMap).filter(
+      (k) => !ORDER.includes(k) && commandMap[k]
     )
   ];
   const details = [];
@@ -1888,23 +1922,8 @@ async function runFeatureValidation(config, paths, runId) {
     test: "not_run"
   };
   for (const key of keys) {
-    const command = config.validation[key];
+    const command = commandMap[key];
     if (!command) continue;
-    if (!Object.prototype.hasOwnProperty.call(scripts, key)) {
-      const state2 = "skipped";
-      validations[key] = state2;
-      details.push({
-        name: key,
-        command,
-        state: state2,
-        exitCode: null,
-        durationMs: 0,
-        stdout: "",
-        stderr: "",
-        skippedReason: `script "${key}" ausente no package.json`
-      });
-      continue;
-    }
     const result = await runCommand(command, paths.cwd);
     const state = result.failed ? "failed" : "passed";
     validations[key] = state;
@@ -1925,8 +1944,8 @@ async function runFeatureValidation(config, paths, runId) {
 }
 
 // src/core/blockers.ts
-import path16 from "path";
-import fs11 from "fs-extra";
+import path14 from "path";
+import fs9 from "fs-extra";
 
 // src/core/gitInfo.ts
 import { execa as execa2 } from "execa";
@@ -1966,10 +1985,10 @@ var TENANT_RE = /tenant_id/i;
 var CREATE_TABLE_RE = /create\s+table/i;
 async function readIfExists(file) {
   try {
-    if (!await fs11.pathExists(file)) return "";
-    const stat = await fs11.stat(file);
+    if (!await fs9.pathExists(file)) return "";
+    const stat = await fs9.stat(file);
     if (!stat.isFile() || stat.size > 1e6) return "";
-    return await fs11.readFile(file, "utf8");
+    return await fs9.readFile(file, "utf8");
   } catch {
     return "";
   }
@@ -2053,7 +2072,7 @@ async function evaluateBlockers(paths, _config, details, recordedFiles) {
   }
   const sqlChanged = changedFiles.filter((f) => /\.sql$/i.test(f));
   for (const rel2 of sqlChanged.slice(0, 30)) {
-    const content = await readIfExists(path16.join(paths.cwd, rel2));
+    const content = await readIfExists(path14.join(paths.cwd, rel2));
     if (CREATE_TABLE_RE.test(content) && !TENANT_RE.test(content)) {
       blockers.push({
         id: "tenant-missing",
@@ -2067,7 +2086,7 @@ async function evaluateBlockers(paths, _config, details, recordedFiles) {
     (f) => WEBHOOK_RE.test(f) && /\.(t|j)sx?$/i.test(f)
   );
   for (const rel2 of webhookChanged.slice(0, 30)) {
-    const content = await readIfExists(path16.join(paths.cwd, rel2));
+    const content = await readIfExists(path14.join(paths.cwd, rel2));
     if (content && !IDEMPOTENT_RE.test(content)) {
       blockers.push({
         id: "webhook-no-idempotency",
@@ -2097,8 +2116,8 @@ async function evaluateBlockers(paths, _config, details, recordedFiles) {
 }
 
 // src/core/runReport.ts
-import path17 from "path";
-import fs12 from "fs-extra";
+import path15 from "path";
+import fs10 from "fs-extra";
 function validationsTable(details) {
   if (details.length === 0) return "_(nenhuma valida\xE7\xE3o configurada)_";
   const rows = details.map((d) => {
@@ -2125,8 +2144,8 @@ async function writeImplementationReport(paths, input) {
   const acceptance = await readAcceptanceStatus(paths.acceptanceCriteria);
   let decisions = "";
   try {
-    if (await fs12.pathExists(paths.decisions)) {
-      decisions = (await fs12.readFile(paths.decisions, "utf8")).trim();
+    if (await fs10.pathExists(paths.decisions)) {
+      decisions = (await fs10.readFile(paths.decisions, "utf8")).trim();
     }
   } catch {
   }
@@ -2170,10 +2189,10 @@ ${nextSteps}
 > Gerado por agent-harness-kit. N\xE3o substitui revis\xE3o humana.
 `;
   const reportPath = runReportPath(paths, run.runId);
-  await fs12.ensureDir(path17.dirname(reportPath));
-  await fs12.writeFile(reportPath, content);
-  await fs12.ensureDir(paths.reportsDir);
-  await fs12.writeFile(paths.reportsLatest, content);
+  await fs10.ensureDir(path15.dirname(reportPath));
+  await fs10.writeFile(reportPath, content);
+  await fs10.ensureDir(paths.reportsDir);
+  await fs10.writeFile(paths.reportsLatest, content);
   return reportPath;
 }
 
@@ -2341,17 +2360,20 @@ async function runHookPromptSubmit(options) {
 }
 
 // src/commands/ui.ts
-import chalk5 from "chalk";
+import chalk4 from "chalk";
 async function renderFallback(cwd, note2) {
   const snap = await loadSnapshot(cwd);
   if (note2) logger.warn(note2);
   logger.title(`Agent Harness \u2014 ${snap.projectName}`);
+  logger.plain(
+    `  Stack: ${snap.stack} \xB7 Skills: ${snap.skillCount} \xB7 Adapters: ${snap.installedAdapters.length ? snap.installedAdapters.join(", ") : "nenhum"}`
+  );
   if (!snap.hasActiveRun || !snap.active) {
     logger.info('Nenhuma execu\xE7\xE3o ativa. Inicie: harness feature start "<nome>"');
   } else {
     const r = snap.active;
-    logger.plain(`  Feature : ${chalk5.bold(r.feature)}`);
-    logger.plain(`  Status  : ${chalk5.cyan(r.status)} \xB7 score ${r.score}/100`);
+    logger.plain(`  Feature : ${chalk4.bold(r.feature)}`);
+    logger.plain(`  Status  : ${chalk4.cyan(r.status)} \xB7 score ${r.score}/100`);
     logger.plain(`  Agente  : ${r.agent} \xB7 ${elapsedLabel(r.startedAt, r.finishedAt)}`);
     logger.plain(
       `  Valida\xE7\xF5es: lint=${r.validations.lint} typecheck=${r.validations.typecheck} build=${r.validations.build} test=${r.validations.test}`
@@ -2359,17 +2381,17 @@ async function renderFallback(cwd, note2) {
     logger.plain(`  Arquivos: ${r.filesChanged.length} \xB7 Eventos: ${r.eventsCount}`);
     if (r.blockReason) {
       logger.warn("Bloqueio:");
-      logger.plain(chalk5.red(r.blockReason));
+      logger.plain(chalk4.red(r.blockReason));
     }
     for (const e of snap.events.slice(-6)) {
       logger.plain(
-        `   ${chalk5.dim(e.timestamp.slice(11, 19))} [${e.type}] ${e.message}`
+        `   ${chalk4.dim(e.timestamp.slice(11, 19))} [${e.type}] ${e.message}`
       );
     }
   }
   if (snap.runs.length > 0) {
     logger.plain();
-    logger.plain(chalk5.dim("  Execu\xE7\xF5es:"));
+    logger.plain(chalk4.dim("  Execu\xE7\xF5es:"));
     for (const r of snap.runs.slice(0, 5)) {
       logger.plain(`   ${r.runId}  ${r.status}  score=${r.score}  ${r.feature}`);
     }
@@ -2392,7 +2414,7 @@ async function runUi(options) {
     const [{ render }, { createElement }, { App }] = await Promise.all([
       import("ink"),
       import("react"),
-      import("./App-XTFCNFNT.js")
+      import("./App-BQ6BC6R5.js")
     ]);
     const instance = render(createElement(App, { cwd }));
     await instance.waitUntilExit();
@@ -2406,12 +2428,12 @@ async function runUi(options) {
 }
 
 // src/commands/runsList.ts
-import chalk6 from "chalk";
+import chalk5 from "chalk";
 function statusColor(status) {
-  if (status === "done" || status === "passed") return chalk6.green(status);
-  if (status === "needs_fix" || status === "failed") return chalk6.red(status);
-  if (status === "validating") return chalk6.yellow(status);
-  return chalk6.cyan(status);
+  if (status === "done" || status === "passed") return chalk5.green(status);
+  if (status === "needs_fix" || status === "failed") return chalk5.red(status);
+  if (status === "validating") return chalk5.yellow(status);
+  return chalk5.cyan(status);
 }
 async function runRunsList() {
   const cwd = process.cwd();
@@ -2424,9 +2446,9 @@ async function runRunsList() {
     return;
   }
   for (const r of runs) {
-    const marker = current?.runId === r.runId ? chalk6.bold("\u27A4 ") : "  ";
+    const marker = current?.runId === r.runId ? chalk5.bold("\u27A4 ") : "  ";
     logger.plain(
-      `${marker}${chalk6.dim(r.runId)}  ${statusColor(r.status)}  score=${r.score}  agent=${r.agent}`
+      `${marker}${chalk5.dim(r.runId)}  ${statusColor(r.status)}  score=${r.score}  agent=${r.agent}`
     );
     logger.plain(`    feature: ${r.feature}`);
     logger.plain(
@@ -2441,12 +2463,12 @@ async function runRunsList() {
 }
 
 // src/commands/statusCmd.ts
-import chalk7 from "chalk";
+import chalk6 from "chalk";
 function vIcon(state) {
-  if (state === "passed") return chalk7.green("\u2705");
-  if (state === "failed") return chalk7.red("\u274C");
-  if (state === "skipped") return chalk7.yellow("\u23ED\uFE0F");
-  return chalk7.dim("\u2022");
+  if (state === "passed") return chalk6.green("\u2705");
+  if (state === "failed") return chalk6.red("\u274C");
+  if (state === "skipped") return chalk6.yellow("\u23ED\uFE0F");
+  return chalk6.dim("\u2022");
 }
 function elapsed(startedAt, finishedAt) {
   const end = finishedAt ? new Date(finishedAt) : /* @__PURE__ */ new Date();
@@ -2465,10 +2487,10 @@ async function runStatus() {
     logger.info('Nenhuma execu\xE7\xE3o ativa. Inicie: harness feature start "<nome>"');
     return;
   }
-  logger.plain(`  Feature : ${chalk7.bold(run.feature)}`);
-  logger.plain(`  Run     : ${chalk7.dim(run.runId)}`);
+  logger.plain(`  Feature : ${chalk6.bold(run.feature)}`);
+  logger.plain(`  Run     : ${chalk6.dim(run.runId)}`);
   logger.plain(`  Agente  : ${run.agent}`);
-  logger.plain(`  Status  : ${chalk7.cyan(run.status)}`);
+  logger.plain(`  Status  : ${chalk6.cyan(run.status)}`);
   logger.plain(`  Score   : ${run.score}/100`);
   logger.plain(`  Tempo   : ${elapsed(run.startedAt, run.finishedAt)}`);
   logger.plain(
@@ -2479,7 +2501,7 @@ async function runStatus() {
   if (run.blockReason) {
     logger.plain();
     logger.warn("Bloqueio:");
-    logger.plain(chalk7.red(run.blockReason));
+    logger.plain(chalk6.red(run.blockReason));
   }
   if (run.reportPath) {
     logger.plain();
@@ -2488,39 +2510,180 @@ async function runStatus() {
   const events = await readEvents(paths, run.runId, 5);
   if (events.length > 0) {
     logger.plain();
-    logger.plain(chalk7.dim("  \xDAltimos eventos:"));
+    logger.plain(chalk6.dim("  \xDAltimos eventos:"));
     for (const e of events) {
       logger.plain(
-        `   ${chalk7.dim(e.timestamp.slice(11, 19))} [${e.type}] ${e.message}`
+        `   ${chalk6.dim(e.timestamp.slice(11, 19))} [${e.type}] ${e.message}`
       );
     }
   }
 }
 
 // src/commands/reportLatest.ts
-import fs13 from "fs-extra";
+import fs11 from "fs-extra";
 async function runReportLatest() {
   const cwd = process.cwd();
   const { paths } = await resolveConfigured(cwd);
   let file = paths.reportsLatest;
-  if (!await fs13.pathExists(file)) {
+  if (!await fs11.pathExists(file)) {
     const active = await readActiveRun(paths);
     if (active) {
       const candidate = runReportPath(paths, active.runId);
-      if (await fs13.pathExists(candidate)) file = candidate;
+      if (await fs11.pathExists(candidate)) file = candidate;
     }
   }
-  if (!await fs13.pathExists(file)) {
+  if (!await fs11.pathExists(file)) {
     logger.warn(
       "Nenhum relat\xF3rio encontrado. Rode `harness feature start` e finalize a feature (ou `harness done`)."
     );
     process.exitCode = 1;
     return;
   }
-  const content = await fs13.readFile(file, "utf8");
+  const content = await fs11.readFile(file, "utf8");
   logger.info(`Relat\xF3rio: ${rel(cwd, file)}`);
   logger.plain();
   logger.plain(content);
+}
+
+// src/commands/skillsList.ts
+import path16 from "path";
+import fs12 from "fs-extra";
+import chalk7 from "chalk";
+function parseRef(subPath) {
+  const parts = subPath.split("/");
+  const name = parts[parts.length - 2] ?? subPath;
+  const category = parts.slice(0, parts.length - 2).join("/") || "(raiz)";
+  return { category, name };
+}
+async function walkInstalled(dir) {
+  if (!await fs12.pathExists(dir)) return [];
+  const out = [];
+  async function walk(d) {
+    for (const e of await fs12.readdir(d, { withFileTypes: true })) {
+      const full = path16.join(d, e.name);
+      if (e.isDirectory()) await walk(full);
+      else if (e.name === "SKILL.md")
+        out.push(path16.relative(dir, full).split(path16.sep).join("/"));
+    }
+  }
+  await walk(dir);
+  return out.sort();
+}
+async function runSkillsList() {
+  const cwd = process.cwd();
+  const { paths, config } = await resolveConfigured(cwd);
+  logger.title("harness skills list");
+  const installed = await walkInstalled(paths.skillsDir);
+  const catalog = (await listCoreSkillTemplates()).map(skillSubPath);
+  const byCat = /* @__PURE__ */ new Map();
+  for (const sp of installed) {
+    const { category, name } = parseRef(sp);
+    byCat.set(category, [...byCat.get(category) ?? [], name]);
+  }
+  logger.plain(`Instaladas em ${rel(cwd, paths.skillsDir)}: ${installed.length}`);
+  if (installed.length === 0) {
+    logger.hint("Rode `harness init` para instalar o core universal.");
+  }
+  for (const [cat, names] of [...byCat.entries()].sort()) {
+    logger.plain(`
+  ${chalk7.bold(cat)} (${names.length})`);
+    for (const n of names.sort()) logger.plain(`    \u2022 ${n}`);
+  }
+  const missing = catalog.filter((c) => !installed.includes(c));
+  logger.plain();
+  logger.plain(
+    `Cat\xE1logo universal: ${catalog.length} skill(s) \u2014 ${missing.length} n\xE3o instalada(s).`
+  );
+  if (config?.installedAdapters?.length) {
+    logger.plain(
+      `Adapters instalados: ${config.installedAdapters.join(", ")}`
+    );
+  } else {
+    logger.hint("Adapters opcionais: harness adapter list / harness adapter add <nome>");
+  }
+}
+
+// src/commands/adapter.ts
+import path17 from "path";
+import fs13 from "fs-extra";
+import chalk8 from "chalk";
+async function runAdapterList() {
+  const cwd = process.cwd();
+  const { config } = await resolveConfigured(cwd);
+  const installed = new Set(config?.installedAdapters ?? []);
+  const profile = await profileProject(cwd).catch(() => null);
+  const suggested = new Map(
+    (profile?.suggestedAdapters ?? []).map((s) => [s.name, s])
+  );
+  logger.title("harness adapter list");
+  const names = await listAdapters();
+  if (names.length === 0) {
+    logger.info("Nenhum adapter no pacote.");
+    return;
+  }
+  for (const name of names) {
+    const m = await readAdapterManifest(name);
+    const tags = [
+      installed.has(name) ? chalk8.green("instalado") : null,
+      suggested.has(name) ? chalk8.yellow(`sugerido (${suggested.get(name).confidence})`) : null
+    ].filter(Boolean).join(" \xB7 ");
+    logger.plain(
+      `  ${chalk8.bold(name)}${tags ? ` [${tags}]` : ""} \u2014 ${m?.description ?? "(sem descri\xE7\xE3o)"}`
+    );
+  }
+  logger.plain();
+  logger.hint("Instale s\xF3 quando precisar: harness adapter add <nome>");
+  logger.hint("Adapters N\xC3O s\xE3o instalados automaticamente.");
+}
+async function runAdapterAdd(rawName) {
+  const cwd = process.cwd();
+  const name = rawName.trim().toLowerCase();
+  const available = await listAdapters();
+  if (!available.includes(name)) {
+    logger.error(
+      `Adapter "${name}" n\xE3o existe. Dispon\xEDveis: ${available.join(", ")}`
+    );
+    process.exitCode = 1;
+    return;
+  }
+  const { paths } = await resolveConfigured(cwd);
+  if (!await fs13.pathExists(paths.configFile)) {
+    logger.error("Projeto n\xE3o inicializado. Rode `harness init` primeiro.");
+    process.exitCode = 1;
+    return;
+  }
+  logger.title(`harness adapter add ${name}`);
+  const manifest = await readAdapterManifest(name);
+  const skillTpls = await listAdapterSkillTemplates(name);
+  let created = 0;
+  for (const relTpl of skillTpls) {
+    const sub = relTpl.replace(`adapters/${name}/skills/`, "");
+    const target = path17.join(paths.skillsDir, "adapters", name, sub);
+    const r = await materializeTemplate(relTpl, target, {}, false);
+    if (r.action === "created") created += 1;
+  }
+  const config = await loadConfig(paths.configFile);
+  if (!config.installedAdapters.includes(name)) {
+    config.installedAdapters = [...config.installedAdapters, name].sort();
+    await fs13.writeJson(paths.configFile, config, { spaces: 2 });
+  }
+  const installedDir = path17.join(paths.harnessDir, "adapters", "installed");
+  await fs13.ensureDir(installedDir);
+  await fs13.writeJson(
+    path17.join(installedDir, `${name}.json`),
+    { name, installedAt: (/* @__PURE__ */ new Date()).toISOString(), manifest },
+    { spaces: 2 }
+  );
+  logger.success(
+    `${created} skill(s) do adapter "${name}" em ${rel(
+      cwd,
+      path17.join(paths.skillsDir, "adapters", name)
+    )}`
+  );
+  logger.step("Re-exporte se usar Codex/Claude: harness export codex|claude-code");
+  logger.hint(
+    "Skills de adapter s\xE3o espec\xEDficas de stack e ficam fora do core universal."
+  );
 }
 
 // src/cli.ts
@@ -2556,7 +2719,12 @@ function buildProgram() {
   reportCmd.command("latest").description("Imprime o relat\xF3rio mais recente no terminal").action(() => guard(() => runReportLatest()));
   program.command("doctor").description("Diagnostica a sa\xFAde do projeto para o harness").action(() => guard(() => runDoctor()));
   const skillCmd = program.command("skill").description("Gerencia skills");
-  skillCmd.command("new").argument("<nome>", "nome da nova skill (kebab-case)").description("Cria uma nova skill com frontmatter e se\xE7\xF5es padronizadas").action((nome) => guard(() => runSkillNew(nome)));
+  skillCmd.command("new").argument("<nome>", "nome da nova skill (kebab-case)").description("Cria skill universal ou de adapter (frontmatter + se\xE7\xF5es)").option("--adapter <stack>", "cria como skill de adapter (stack espec\xEDfica)").option("--category <cat>", "categoria da skill universal (default: custom)").option("--risk <nivel>", "low | medium | high (default: medium)").action((nome, opts) => guard(() => runSkillNew(nome, opts)));
+  const skillsCmd = program.command("skills").description("Lista skills (instaladas, cat\xE1logo, categoria)");
+  skillsCmd.command("list").description("Lista skills instaladas e dispon\xEDveis por categoria").action(() => guard(() => runSkillsList()));
+  const adapterCmd = program.command("adapter").description("Gerencia adapters opcionais por stack (fora do core)");
+  adapterCmd.command("list").description("Lista adapters dispon\xEDveis e sugeridos").action(() => guard(() => runAdapterList()));
+  adapterCmd.command("add").argument("<nome>", "nome do adapter (ex.: node, python, nextjs)").description("Instala as skills de um adapter (somente quando voc\xEA pede)").action((nome) => guard(() => runAdapterAdd(nome)));
   const failureCmd = program.command("failure").description("Gerencia o registro de falhas");
   failureCmd.command("add").argument("<descricao>", "descri\xE7\xE3o da falha").description("Registra uma falha estruturada em failures.md").action((descricao) => guard(() => runFailureAdd(descricao)));
   const hooksCmd = program.command("hooks").description("Instala hooks locais de integra\xE7\xE3o (Codex / Claude Code)");
@@ -2583,20 +2751,20 @@ function buildProgram() {
     "after",
     `
 Exemplos:
-  ${chalk8.cyan("harness install")}                 ${chalk8.dim(
+  ${chalk9.cyan("harness install")}                 ${chalk9.dim(
       "# assistente interativo (recomendado)"
     )}
-  ${chalk8.cyan(
+  ${chalk9.cyan(
       "harness install --yes --agent claude-code --pm npm"
     )}
-  ${chalk8.cyan(
+  ${chalk9.cyan(
       'harness feature start "QR Code Evolution por barbearia" --agent claude'
     )}
-  ${chalk8.cyan("harness ui")}
-  ${chalk8.cyan(
+  ${chalk9.cyan("harness ui")}
+  ${chalk9.cyan(
       "harness status"
     )}
-  ${chalk8.cyan("harness report latest")}
+  ${chalk9.cyan("harness report latest")}
 `
   );
   return program;

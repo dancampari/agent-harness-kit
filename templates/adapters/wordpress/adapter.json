@@ -1,0 +1,6 @@
+{
+  "name": "wordpress",
+  "description": "Adapter para WordPress: revisão de segurança de plugins e uso correto de hooks/sanitização.",
+  "detect": { "files": ["wp-config.php", "wp-load.php", "wp-content"], "dependencies": ["wordpress", "wp-cli"] },
+  "skills": ["wp-plugin-safety-review", "wp-hooks-and-sanitization-review"]
+}

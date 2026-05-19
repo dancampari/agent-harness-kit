@@ -1,7 +1,8 @@
 # Contexto do Projeto — {{PROJECT_NAME}}
 
-> Este documento dá ao agente o entendimento estável do projeto.
-> Mantenha-o curto, verdadeiro e atualizado.
+> Entendimento estável do projeto para o agente. Curto, verdadeiro e
+> atualizado. Universal — preencha conforme a stack real (detectada por
+> `harness doctor`), sem suposições.
 
 ## Visão geral
 
@@ -9,35 +10,40 @@
 - Quem usa
 - Qual problema resolve
 
-## Stack
+## Stack (preencher com o que existe de fato)
 
-- Linguagens / frameworks principais
-- Banco de dados / serviços (ex.: Supabase, Postgres)
-- Integrações (ex.: Evolution API v2, n8n, gateways)
+- Linguagem(ns) e gerenciador de pacotes
+- Framework(s), se houver
+- Persistência / serviços externos, se houver
+- Integrações externas, se houver
 
 ## Arquitetura (resumo)
 
 - Estrutura de pastas relevante
-- Limites de módulos
-- Padrões obrigatórios (tipagem, validação de input, tratamento de erro)
+- Limites de módulos / fronteiras
+- Padrões obrigatórios do projeto (validação, erros, contratos)
 
-## Multi-tenant
+## Domínio e dados
 
-- Como o isolamento por tenant funciona (coluna `tenant_id`? schema?)
-- Quais entidades são por tenant
-- Onde NÃO pode haver vazamento entre tenants
+- Entidades principais
+- Se há múltiplos donos/tenants: como o isolamento é feito
+- Onde NÃO pode haver vazamento entre contextos
 
 ## Segurança
 
-- RLS ativo? Em quais tabelas?
-- Onde ficam segredos / variáveis de ambiente
-- O que nunca pode ir para o client
+- Fronteiras de autenticação/autorização
+- Onde fica configuração sensível / segredos
+- O que nunca pode ser exposto
 
 ## Convenções
 
 - Padrão de nomes
 - Padrão de commits / branches
 - Padrão de testes
+
+## Validações disponíveis
+
+- Comandos de lint/typecheck/build/test reais (ou "não há")
 
 ## Riscos conhecidos
 

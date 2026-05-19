@@ -78,6 +78,18 @@ export function App({ cwd }: AppProps): JSX.Element {
         <Text bold>{snap.projectName}</Text>
         <Text dimColor> (q para sair)</Text>
       </Box>
+      <Box>
+        <Text dimColor>stack: </Text>
+        <Text>{snap.stack}</Text>
+        <Text dimColor> · skills: </Text>
+        <Text>{snap.skillCount}</Text>
+        <Text dimColor> · adapters: </Text>
+        <Text>
+          {snap.installedAdapters.length > 0
+            ? snap.installedAdapters.join(", ")
+            : "nenhum"}
+        </Text>
+      </Box>
 
       {!snap.hasActiveRun || !run ? (
         <Box marginTop={1} flexDirection="column">

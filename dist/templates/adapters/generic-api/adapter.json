@@ -1,0 +1,6 @@
+{
+  "name": "generic-api",
+  "description": "Adapter para integrações com APIs de terceiros e automação de workflows (ex.: n8n, Evolution).",
+  "detect": { "files": ["openapi.yaml", "openapi.json", "swagger.json", "swagger.yaml"], "dependencies": ["axios", "got", "node-fetch", "requests", "httpx", "guzzlehttp/guzzle"] },
+  "skills": ["third-party-integration-review", "workflow-automation-review"]
+}

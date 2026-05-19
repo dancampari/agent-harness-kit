@@ -1,6 +1,6 @@
-import { readPackageScripts } from "./config.js";
 import { runCommand } from "./command-runner.js";
 import { writeValidationJson, updateRun } from "./runStore.js";
+import { resolveValidationCommands } from "./validationResolve.js";
 import type { ProjectPaths } from "./paths.js";
 import type {
   HarnessConfig,
@@ -35,11 +35,12 @@ export async function runFeatureValidation(
   paths: ProjectPaths,
   runId: string,
 ): Promise<FeatureValidationResult> {
-  const scripts = await readPackageScripts(paths.packageJson);
+  const resolved = await resolveValidationCommands(config, paths.cwd);
+  const commandMap = resolved.commands;
   const keys = [
-    ...ORDER.filter((k) => config.validation[k]),
-    ...Object.keys(config.validation).filter(
-      (k) => !ORDER.includes(k as (typeof ORDER)[number]) && config.validation[k],
+    ...ORDER.filter((k) => commandMap[k]),
+    ...Object.keys(commandMap).filter(
+      (k) => !ORDER.includes(k as (typeof ORDER)[number]) && commandMap[k],
     ),
   ];
 
@@ -52,24 +53,8 @@ export async function runFeatureValidation(
   };
 
   for (const key of keys) {
-    const command = config.validation[key];
+    const command = commandMap[key];
     if (!command) continue;
-
-    if (!Object.prototype.hasOwnProperty.call(scripts, key)) {
-      const state: ValidationState = "skipped";
-      validations[key] = state;
-      details.push({
-        name: key,
-        command,
-        state,
-        exitCode: null,
-        durationMs: 0,
-        stdout: "",
-        stderr: "",
-        skippedReason: `script "${key}" ausente no package.json`,
-      });
-      continue;
-    }
 
     const result = await runCommand(command, paths.cwd);
     const state: ValidationState = result.failed ? "failed" : "passed";

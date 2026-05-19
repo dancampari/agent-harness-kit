@@ -1,0 +1,6 @@
+{
+  "name": "react",
+  "description": "Adapter para projetos React: revisão de estado/efeitos e performance de renderização.",
+  "detect": { "files": [], "dependencies": ["react", "react-dom"] },
+  "skills": ["react-state-and-effects-review", "react-performance-review"]
+}

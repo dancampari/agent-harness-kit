@@ -11,6 +11,11 @@ async function renderFallback(cwd: string, note?: string): Promise<void> {
   const snap = await loadSnapshot(cwd);
   if (note) logger.warn(note);
   logger.title(`Agent Harness — ${snap.projectName}`);
+  logger.plain(
+    `  Stack: ${snap.stack} · Skills: ${snap.skillCount} · Adapters: ${
+      snap.installedAdapters.length ? snap.installedAdapters.join(", ") : "nenhum"
+    }`,
+  );
 
   if (!snap.hasActiveRun || !snap.active) {
     logger.info('Nenhuma execução ativa. Inicie: harness feature start "<nome>"');

@@ -6,7 +6,12 @@ import {
   writeJson,
   pathExists,
 } from "../core/file-system.js";
-import { materializeTemplate, SKILL_DIRS, HOOK_FILES } from "../core/templates.js";
+import {
+  materializeTemplate,
+  listCoreSkillTemplates,
+  skillSubPath,
+  HOOK_FILES,
+} from "../core/templates.js";
 import {
   defaultConfig,
   loadConfig,
@@ -51,6 +56,8 @@ export async function runInit(options: InitOptions): Promise<void> {
   await ensureDirWithKeep(paths.reportsDir);
   await ensureDirWithKeep(paths.evalsDir);
   await ensureDirWithKeep(paths.skillsDir);
+  await ensureDirWithKeep(path.join(paths.harnessDir, "adapters", "available"));
+  await ensureDirWithKeep(path.join(paths.harnessDir, "adapters", "installed"));
   if (targets.includes("codex")) await ensureDirWithKeep(paths.codexHooksDir);
   if (targets.includes("claude-code")) {
     await ensureDirWithKeep(paths.claudeSkillsDir);
@@ -115,12 +122,17 @@ export async function runInit(options: InitOptions): Promise<void> {
     if (r.action === "created") logger.success(`Criado ${rel(cwd, paths.agentsFile)}`);
   }
 
-  // 6. Skills neutras (sempre)
-  for (const skill of SKILL_DIRS) {
-    const target = path.join(paths.skillsDir, skill, "SKILL.md");
-    const r = await materializeTemplate(`skills/${skill}/SKILL.md`, target, vars, force);
-    if (r.action === "created") logger.success(`Criado ${rel(cwd, target)}`);
+  // 6. Skills universais do core (somente core — adapters são opcionais)
+  const coreSkills = await listCoreSkillTemplates();
+  let coreCreated = 0;
+  for (const relTpl of coreSkills) {
+    const target = path.join(paths.skillsDir, skillSubPath(relTpl));
+    const r = await materializeTemplate(relTpl, target, vars, force);
+    if (r.action === "created") coreCreated += 1;
   }
+  logger.success(
+    `${coreCreated} skill(s) universal(is) instalada(s) em ${rel(cwd, paths.skillsDir)} (${coreSkills.length} no catálogo)`,
+  );
 
   // 7. Estrutura do Codex
   if (targets.includes("codex")) {
@@ -150,16 +162,15 @@ export async function runInit(options: InitOptions): Promise<void> {
     if (claudeMd.action === "created") {
       logger.success(`Criado ${rel(cwd, paths.claudeFile)}`);
     }
-    for (const skill of SKILL_DIRS) {
-      const target = path.join(paths.claudeSkillsDir, skill, "SKILL.md");
-      const r = await materializeTemplate(
-        `skills/${skill}/SKILL.md`,
-        target,
-        vars,
-        force,
-      );
-      if (r.action === "created") logger.success(`Criado ${rel(cwd, target)}`);
+    let claudeSkills = 0;
+    for (const relTpl of coreSkills) {
+      const target = path.join(paths.claudeSkillsDir, skillSubPath(relTpl));
+      const r = await materializeTemplate(relTpl, target, vars, force);
+      if (r.action === "created") claudeSkills += 1;
     }
+    logger.success(
+      `${claudeSkills} skill(s) em ${rel(cwd, paths.claudeSkillsDir)}`,
+    );
     for (const hook of HOOK_FILES) {
       const target = path.join(paths.claudeHooksDir, hook);
       const r = await materializeTemplate(`claude/hooks/${hook}`, target, vars, force);

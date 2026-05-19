@@ -1,81 +1,102 @@
 # AGENTS.md
 
 > Projeto: {{PROJECT_NAME}}
-> Este projeto é controlado por **Agent Harness Engineering**. Leia este
-> arquivo antes de qualquer implementação.
+> Prompt Master **universal** de Agent Harness Engineering. Não assume
+> stack, framework, banco de dados nem arquitetura.
 
 ## Papel do agente
 
 Você está trabalhando dentro de um projeto controlado por Agent Harness
-Engineering. Não execute tarefas como um agente one-shot. Siga o ciclo
-obrigatório:
+Engineering.
 
-1. Ler contexto
-2. Confirmar entendimento
-3. Identificar arquivos relevantes
-4. Planejar
-5. Implementar em passos pequenos
-6. Validar
-7. Corrigir falhas
-8. Registrar decisões
-9. Só declarar conclusão após validação
+Seu objetivo é entregar mudanças corretas, seguras, verificáveis e bem
+documentadas.
+
+Não aja como agente one-shot.
+
+## Ciclo obrigatório
+
+1. Entender o projeto
+2. Detectar stack e estrutura
+3. Ler a tarefa atual
+4. Identificar riscos
+5. Selecionar skills relevantes
+6. Planejar antes de implementar
+7. Implementar em passos pequenos
+8. Validar
+9. Corrigir falhas
+10. Registrar decisões
+11. Gerar relatório
+12. Só declarar conclusão se os critérios forem cumpridos
 
 ## Fontes obrigatórias
 
-Antes de implementar, leia:
+Antes de implementar, leia quando existirem:
 
 - `.harness/project-context.md`
 - `.harness/current-task.md`
 - `.harness/acceptance-criteria.md`
 - `.harness/qa-checklist.md`
+- `.harness/decisions.md`
 - `.harness/failures.md`
-- skills relevantes em `.agents/skills/`
+- `.agents/skills/`
 
-## Regras não negociáveis
+## Regras universais
 
-- Não declarar conclusão sem rodar validações.
-- Não ignorar critérios de aceite.
-- Não fazer grandes refatorações fora do escopo.
-- Não remover funcionalidades existentes sem justificativa.
-- Não criar dependências novas sem explicar a necessidade.
-- Não alterar arquitetura sem registrar decisão em `.harness/decisions.md`.
-- Não usar valores secretos hardcoded.
-- Não quebrar multi-tenant.
-- Não ignorar RLS quando o projeto usar Supabase.
-- Não enviar mensagens/eventos automáticos sem toggle ou configuração explícita.
-- Não implementar webhooks sem idempotência.
+- Não assuma a stack sem verificar arquivos do projeto.
+- Não altere arquitetura sem necessidade clara.
+- Não faça refatorações grandes fora do escopo.
+- Não remova funcionalidades sem justificativa.
+- Não introduza dependências sem explicar motivo.
+- Não hardcode secrets, tokens, senhas ou chaves.
+- Não ignore erros de build, lint, typecheck ou testes.
+- Não declare conclusão sem validação.
+- Não oculte falhas.
+- Não modifique arquivos críticos sem registrar decisão.
+- Não confunda protótipo com entrega final.
+- Não invente comandos que não existem no projeto.
+- Não diga que executou algo sem evidência.
+
+## Detecção de projeto
+
+Antes de implementar, verifique arquivos como:
+
+- `package.json`
+- `pnpm-lock.yaml`
+- `package-lock.json`
+- `yarn.lock`
+- `pyproject.toml`
+- `requirements.txt`
+- `go.mod`
+- `Cargo.toml`
+- `composer.json`
+- `pom.xml`
+- `build.gradle`
+- `Dockerfile`
+- `docker-compose.yml`
+- `.github/workflows`
+- arquivos de configuração do framework
+- arquivos de teste
+- arquivos de banco/migrations
+- README
+
+## Skills
+
+As skills universais ficam em `.agents/skills/<categoria>/<skill>/SKILL.md`
+(core, engineering, architecture, quality, security, data, frontend, api,
+operations, agent-behavior). Skills específicas de stack só existem se um
+**adapter** for instalado (`harness adapter add <nome>`) — nunca no core.
+
+Selecione apenas as skills relevantes à tarefa e ao perfil do projeto.
 
 ## Definição de pronto
 
 Uma tarefa só está pronta quando:
 
-- Código implementado
-- Critérios de aceite cumpridos
-- Lint executado ou justificado
-- Typecheck executado ou justificado
-- Build executado ou justificado
-- Testes executados ou justificados
-- Riscos documentados
-- Decisões registradas
-- Nenhuma pendência crítica restante
-
-## Skills disponíveis
-
-| Skill | Use para |
-|---|---|
-| `nextjs-supabase-builder` | Implementar funcionalidades Next.js + Supabase |
-| `supabase-rls-reviewer` | Revisar RLS, tenant_id, policies, migrations |
-| `n8n-evolution-workflow` | Padronizar workflows n8n + Evolution API v2 |
-| `qa-before-done` | Impedir vitória prematura |
-| `multi-tenant-security-reviewer` | Revisar isolamento de dados por tenant |
-| `webhook-idempotency-reviewer` | Evitar processamento duplicado de webhooks |
-
-## Comandos de apoio (humano/dev roda; o agente não chama LLM)
-
-- `harness validate` — roda lint/typecheck/build/test e gera relatório
-- `harness done` — verificação anti-vitória-prematura
-- `harness report` — consolida o estado da tarefa
-- `harness failure add "..."` — registra falha que vira regra preventiva
-
-> Lembrete final: **na dúvida, não declare vitória.** Rode as validações,
-> marque os critérios de aceite e registre decisões.
+- A implementação foi feita
+- Os critérios de aceite foram cumpridos
+- As validações possíveis foram executadas
+- Falhas foram corrigidas ou documentadas
+- Decisões técnicas foram registradas
+- O relatório foi gerado
+- Não há pendência crítica conhecida

@@ -25,6 +25,8 @@ import { runUi } from "./commands/ui.js";
 import { runRunsList } from "./commands/runsList.js";
 import { runStatus } from "./commands/statusCmd.js";
 import { runReportLatest } from "./commands/reportLatest.js";
+import { runSkillsList } from "./commands/skillsList.js";
+import { runAdapterList, runAdapterAdd } from "./commands/adapter.js";
 
 const VERSION = "0.1.0";
 
@@ -118,8 +120,32 @@ export function buildProgram(): Command {
   skillCmd
     .command("new")
     .argument("<nome>", "nome da nova skill (kebab-case)")
-    .description("Cria uma nova skill com frontmatter e seções padronizadas")
-    .action((nome: string) => guard(() => runSkillNew(nome)));
+    .description("Cria skill universal ou de adapter (frontmatter + seções)")
+    .option("--adapter <stack>", "cria como skill de adapter (stack específica)")
+    .option("--category <cat>", "categoria da skill universal (default: custom)")
+    .option("--risk <nivel>", "low | medium | high (default: medium)")
+    .action((nome: string, opts) => guard(() => runSkillNew(nome, opts)));
+
+  const skillsCmd = program
+    .command("skills")
+    .description("Lista skills (instaladas, catálogo, categoria)");
+  skillsCmd
+    .command("list")
+    .description("Lista skills instaladas e disponíveis por categoria")
+    .action(() => guard(() => runSkillsList()));
+
+  const adapterCmd = program
+    .command("adapter")
+    .description("Gerencia adapters opcionais por stack (fora do core)");
+  adapterCmd
+    .command("list")
+    .description("Lista adapters disponíveis e sugeridos")
+    .action(() => guard(() => runAdapterList()));
+  adapterCmd
+    .command("add")
+    .argument("<nome>", "nome do adapter (ex.: node, python, nextjs)")
+    .description("Instala as skills de um adapter (somente quando você pede)")
+    .action((nome: string) => guard(() => runAdapterAdd(nome)));
 
   const failureCmd = program
     .command("failure")
