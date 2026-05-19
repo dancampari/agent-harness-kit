@@ -1,5 +1,7 @@
 node_modules/
-dist/
+# dist/ é VERSIONADO de propósito: a instalação via GitHub (`npm i -g`)
+# não instala devDependencies, então não há como compilar no `prepare`.
+# Com o dist/ pronto no repo, o prepare apenas detecta e segue.
 *.log
 .DS_Store
 coverage/

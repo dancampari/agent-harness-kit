@@ -1,0 +1,44 @@
+{
+  "$comment": "Exemplo de hooks para Claude Code (escopo de PROJETO). NÃO é aplicado automaticamente pela CLI — copie para .claude/settings.json (ou .claude/settings.local.json) e revise. Os hooks são scripts locais e não chamam nenhuma API de IA.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx tsx .claude/hooks/pre_tool_use_policy.ts"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx tsx .claude/hooks/post_tool_use_review.ts"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx tsx .claude/hooks/stop_validate_done.ts"
+          }
+        ]
+      }
+    ]
+  },
+  "_notes": [
+    "PreToolUse: exit 2 BLOQUEIA a ferramenta e devolve o stderr ao Claude.",
+    "PostToolUse: apenas registra/observa (exit 0); não bloqueia.",
+    "Stop: bloqueia a parada (exit 2) se houver pendência crítica, respeitando stop_hook_active para não criar loop.",
+    "Troque 'npx tsx' por 'node' (Node 22+: node --experimental-strip-types) se preferir não depender de tsx.",
+    "Validações pesadas continuam em `harness validate` e `harness done`."
+  ]
+}

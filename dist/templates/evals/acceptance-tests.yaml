@@ -1,0 +1,18 @@
+# Testes de aceitação descritos em alto nível (Given/When/Then).
+# Espelham .harness/acceptance-criteria.md de forma executável-por-humano.
+# A CLI não roda LLM nem estes cenários — eles guiam implementação e QA.
+
+version: 1
+task: ""
+scenarios:
+  - id: happy-path
+    title: "Fluxo principal funciona"
+    given: "Pré-condições da tarefa atendidas"
+    when: "A ação principal é executada"
+    then: "O resultado esperado ocorre e é observável"
+
+  - id: invalid-input
+    title: "Entrada inválida é tratada"
+    given: "Input fora do contrato"
+    when: "A ação é tentada"
+    then: "Erro claro, sem efeito colateral, sem vazamento de dados"
