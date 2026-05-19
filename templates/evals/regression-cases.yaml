@@ -1,0 +1,19 @@
+# Casos de regressão — comportamentos que NÃO podem quebrar.
+# Não executado automaticamente pela CLI; serve de contrato para o agente
+# e para revisão humana. Adicione um caso a cada bug corrigido.
+
+version: 1
+cases:
+  - id: example-no-tenant-leak
+    title: "Nenhuma query retorna dados de outro tenant"
+    given: "Usuário autenticado do tenant A"
+    when: "Lista entidades operacionais"
+    then: "Apenas registros com tenant_id == A são retornados"
+    severity: critical
+
+  - id: example-webhook-idempotent
+    title: "Webhook duplicado não processa duas vezes"
+    given: "Evento já processado (mesma chave idempotente)"
+    when: "O mesmo evento chega novamente"
+    then: "O sistema ignora com segurança e responde 200"
+    severity: high

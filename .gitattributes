@@ -1,0 +1,9 @@
+# Normaliza para LF no repositório (consumidores em Linux/macOS dependem
+# disso para o shebang e os scripts .mjs funcionarem). O Windows ainda
+# faz checkout conforme core.autocrlf local.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary

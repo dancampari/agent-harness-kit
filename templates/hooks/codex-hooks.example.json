@@ -1,0 +1,25 @@
+{
+  "$comment": "Exemplo de wiring de hooks para Codex. NÃO é aplicado automaticamente — copie/adapte para a configuração do seu agente. Os hooks são scripts locais e não chamam nenhuma API de IA.",
+  "hooks": {
+    "preToolUse": {
+      "command": "npx tsx .codex/hooks/pre_tool_use_policy.ts",
+      "description": "Bloqueia comandos destrutivos (rm -rf, git reset --hard, etc.)",
+      "blocking": true
+    },
+    "postToolUse": {
+      "command": "npx tsx .codex/hooks/post_tool_use_review.ts",
+      "description": "Registra comandos em .harness/runs/commands.log e alerta falhas",
+      "blocking": false
+    },
+    "stop": {
+      "command": "npx tsx .codex/hooks/stop_validate_done.ts",
+      "description": "Checagens leves: critérios de aceite e relatório",
+      "blocking": false
+    }
+  },
+  "notes": [
+    "Os nomes de eventos (preToolUse/postToolUse/stop) variam conforme a versão do agente — ajuste.",
+    "Em vez de 'npx tsx' você pode compilar os hooks ou usar 'node --experimental-strip-types' (Node 22+).",
+    "Use 'harness validate' e 'harness done' para validações pesadas; os hooks são apenas guarda-rails leves."
+  ]
+}
