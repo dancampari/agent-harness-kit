@@ -30,8 +30,12 @@ harness install        # assistente interativo
 Pré-requisitos no computador do usuário: **Node.js >= 18.17** e **git**
 (o npm já vem com o Node). Funciona em Windows PowerShell, macOS e Linux.
 
-> Quando publicado no npm, ficará ainda mais curto:
-> `npm i -g agent-harness-kit`.
+Pelo npm (após publicado, escopo da conta):
+
+```bash
+npm i -g @dancampari/agent-harness-kit
+# ou: npx @dancampari/agent-harness-kit install
+```
 
 ---
 

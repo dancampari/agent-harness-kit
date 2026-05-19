@@ -1,6 +1,9 @@
 {
-  "name": "agent-harness-kit",
+  "name": "@dancampari/agent-harness-kit",
   "version": "0.1.0",
+  "publishConfig": {
+    "access": "public"
+  },
   "description": "CLI local para preparar, instalar, versionar e validar estruturas de Agent Harness Engineering (Codex, Claude Code, Cursor). Não chama nenhuma API de LLM.",
   "type": "module",
   "license": "MIT",
