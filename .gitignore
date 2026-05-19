@@ -9,6 +9,9 @@ coverage/
 # Backups gerados pela CLI ao usar --force
 *.bak-*
 
+# Nunca versionar credenciais npm
+.npmrc
+
 # Artefatos que a própria CLI gera ao ser aplicada (não fazem parte do
 # código-fonte do kit; a fonte de verdade fica em `templates/`).
 /AGENTS.md
